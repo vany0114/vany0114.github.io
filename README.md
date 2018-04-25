@@ -1,1 +1,3 @@
-# my-blog
+# My personal blog :)
+
+http://elvanydev.com/

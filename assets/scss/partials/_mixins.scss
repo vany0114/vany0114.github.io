@@ -1,0 +1,96 @@
+/***************
+TRANSITION
+***************/
+
+/* @include transition(all 0.2s ease-in-out); */
+@mixin transition($transition...) {
+  // defining prefixes so we can use them in mixins below
+  $prefixes:      ("-webkit-", "" );
+  @each $prefix in $prefixes {
+    #{$prefix}transition: $transition;
+  }
+}
+
+
+/***************
+BOX SIZING
+***************/
+
+/* @include box-sizing(border-box); */
+@mixin box-sizing($type: border-box) {
+	-webkit-box-sizing: $type;
+	-moz-box-sizing:    $type;
+	-ms-box-sizing:     $type;
+	box-sizing:         $type;
+}
+
+
+/***************
+CLEAR AFTER FLOATS
+***************/
+
+@mixin clearfix {
+  zoom:1;
+  &:before, &:after {
+    content: "\0020"; 
+    display: block; 
+    height: 0; 
+    overflow: hidden; 
+  }
+  &:after {
+    clear: both;
+  }
+}
+
+.clearfix {
+  @include clearfix;
+}
+
+// mixin font-size
+@mixin font-size($px) {
+  $pxValue: strip-unit($px);
+  $remValue: $pxValue / 16;
+  // font-size: $pxValue + px;
+  font-size: $remValue + rem;
+}
+
+@function strip-unit($number) {
+  @if type-of($number) == 'number' and not unitless($number) {
+    @return $number / ($number * 0 + 1);
+  }
+
+  @return $number;
+}
+
+// # mixin for media-query
+@mixin media($query: $feature $value) {
+  @if length($query) == 1 {
+    @media ($default-feature: nth($query, 1)) {
+      @content;
+    }
+  }
+
+  @else {
+    $loop-to: length($query);
+    $media-query: 'screen and ';
+
+    @if length($query) % 2 != 0 {
+      $loop-to: $loop-to - 1;
+    }
+
+    $i: 1;
+    @while $i <= $loop-to {
+      $media-query: $media-query + '(' + nth($query, $i) + ': ' + nth($query, $i + 1) + ') ';
+
+      @if ($i + 1) != $loop-to {
+        $media-query: $media-query + 'and ';
+      }
+
+      $i: $i + 2;
+    }
+
+    @media #{$media-query} {
+      @content;
+    }
+  }
+}

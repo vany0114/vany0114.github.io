@@ -1,0 +1,94 @@
+/***************
+COLOR VARIABLES
+***************/
+
+// Better default colors
+// Cool
+$aqua:  #7FDBFF;
+$blue:  #0074D9;
+$navy:  #001F3F;
+$teal:  #39CCCC;
+$green: #2ECC40;
+$olive: #3D9970;
+$lime:  #01FF70;
+// Warm
+$yellow:  #FFDC00;
+$orange:  #FF851B;
+$red:     #FF4136;
+$fuchsia: #F012BE;
+$purple:  #B10DC9;
+$maroon:  #85144B;
+// Gray Scale
+$white:  #fff;
+$silver: #ddd;
+$grey:   #aaa;
+$black:  #111;
+
+// Color variables
+$primary-color: seagreen;
+$secondary-color: #233E5B;
+$tertiary-color: #aaa;
+$link-color: $primary-color;
+$background-color: seagreen;
+
+$bad-color: $red; // Bad color for errors, validation etc.
+$good-color: $green; // Good color for success etc.
+$info-color: $blue; // Good color for success etc.
+$warning-color: $orange; // Good color for success etc.
+$subtle-color: $grey; // Subtle color for subtle text
+
+// Colors
+
+$primary-color: #f32853 !default;
+
+$white-color: #fff !default;
+$silver-color: darken($white-color, 22%) !default; // ~ #ccc
+$black-color: #000 !default;
+$gray-color: darken($white-color, 42%) !default; // ~ #999
+
+$bg-color: #e8e8e8 !default;
+$txt-color: rgba(lighten($black-color, 5%), .65) !default;
+
+$blue-color: #016BA9 !default;
+
+$border-color: #f1f2f3 !default;
+
+/***************
+CONSISTENT SETTINGS
+***************/
+
+$br: 5px; // Border-radius
+$btn-br: 5px; // Button border-radius
+$padding: 40px; // Padding and margins
+$line-height: 44px; // Consistent height for buttons, inputs etc.
+
+
+/***************
+TYPE SETTINGS
+***************/
+
+$sans-serif: "Open Sans", Helvetica, Arial, sans-serif;
+$serif: "PT Serif", Georgia, Times, serif;
+
+// $font-family-base: "Raleway", Helvetica, sans-serif !default;
+$font-family-base: "Droid Sans", Helvetica, sans-serif !default;
+$font-family-serif: "Droid Serif", sans-serif !default;
+$line-height: 1.8 !default;
+$font-size-base: 18px !default;
+
+
+$screen-phone   : 30em !default;
+$screen-tablet  : 37em !default;
+$screen-desktop : 56em !default;
+
+@function em($pixels, $context: $font-size-base) {
+  @if (unitless($pixels)) {
+    $pixels: $pixels * 1px;
+  }
+
+  @if (unitless($context)) {
+    $context: $context * 1px;
+  }
+
+  @return $pixels / $context * 1em;
+}

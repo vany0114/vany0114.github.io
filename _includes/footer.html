@@ -1,0 +1,36 @@
+<div class="footer">
+   <div class="container">
+      <p class="copy">&copy; {{ site.time | date: '%Y' }} <a href="https://vany0114.github.io">Geovanny Alzate Sandoval</a> Made with <a href="http://jekyllrb.com">Jekyll</a></p>
+
+      <div class="footer-links"> 
+         <ul class="noList"> 
+            {% if site.social.facebook %}
+            <li><a href="https://www.facebook.com/{{ site.social.facebook }}">
+                  <i class="svg-icon facebook"></i>
+            </a></li>
+            {% endif %}
+            {% if site.social.twitter %}
+            <li><a href="https://twitter.com/{{ site.social.twitter }}">
+                  <i class="svg-icon twitter"></i>
+            </a></li>
+            {% endif %}
+            {% if site.social.github %}
+            <li><a href="https://github.com/{{ site.social.github }}">
+                  <i class="svg-icon github"></i>
+                  </svg>
+            </a></li>
+            {% endif %} 
+            {% if site.social.email %}
+            <li><a href="mailto:{{ site.social.email }}">
+                  <i class="svg-icon email"></i>
+            </a></li>
+            {% endif %}
+            {% if site.social.linkedin %}
+            <li><a href="https://www.linkedin.com/in/{{ site.social.linkedin }}/?locale=en_US">
+                  <i class="svg-icon linkedin"></i>
+            </a></li>
+            {% endif %} 
+         </ul>
+      </div>
+   </div>
+</div><!-- end .footer -->
