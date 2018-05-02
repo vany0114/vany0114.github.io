@@ -95,7 +95,7 @@ So, we’re going to explain briefly the most important orchestrators that exist
 
 So, we're going to use ***Azure Service Fabric*** to deploy our microservices ***because*** it provides us a great way to solve hard problems such as deploying, running, scale out and utilizing infrastructure resources efficiently due to Azure Service Fabric enables you to:
 
-* Deploy and orchestrate containers that include Windows containers and Linux containers.
+* Deploy and orchestrate Windows and Linux containers.
 * Deploy applications in seconds, at high density with hundreds or thousands of applications or containers per machine.
 * Deploy different versions of the same application side by side, and upgrade each application independently.
 * Manage the lifecycle of your applications without any downtime, including breaking and nonbreaking upgrades.
