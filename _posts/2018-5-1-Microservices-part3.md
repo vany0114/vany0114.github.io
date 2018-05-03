@@ -2,11 +2,11 @@
 layout: post
 title: Microservices and Docker with .Net Core and Azure Service Fabric - Part three
 comments: true
-excerpt: In the previous post, we reviewed an approach, where we have two “different” architectures, one for the development environment and another one to the production environment, why that approach could be useful, and how Docker can help us to implement them. Also, we talk about the benefits to use Docker and why .Net Core is the better option to start to work with microservices. Besides, we talked about of the most popular microservices orchestrator and why we choose Azure Service Fabric. Finally, we explained how Command and Query Responsibility Segregation (CQRS) and Event Sourcing comes into play in our architecture. In the end, we made decisions about what technologies we were going to use to implement our architecture, and the most important thing, why. So in this post we’re going to understand the code, finally!
+excerpt: In the previous post, we reviewed an approach, where we have two “different” architectures, one for the development environment and another one for the production environment, why that approach could be useful, and how Docker can help us to implement them. Also, we talked about the benefits of using Docker and why .Net Core is the better option to start working with microservices. Besides, we talked about of the most popular microservices orchestrator and why we choose Azure Service Fabric. Finally, we explained how Command and Query Responsibility Segregation (CQRS) and Event Sourcing comes into play in our architecture. In the end, we made decisions about what technologies we were going to use to implement our architecture, and the most important thing, why. So in this post we’re going to understand the code, finally!
 keywords: "asp.net core, Docker, Docker compose, linux, C#, c-sharp, DDD, .net core, dot net core, .net core 2.0, dot net core 2.0, .netcore2.0, asp.net, entity framework, entity framework core, EF Core, domain driven design, CQRS, command and query responsibility segregation, azure, microsoft azure, azure service fabric, service fabric, cosmos db, mongodb, sql server, rabbitmq, rabbit mq, amqp, asp.net web api, azure service bus, service bus"
 ---
 
-In the [previous post](http://elvanydev.com/Microservices-part2/), we reviewed an approach, where we have two “different” architectures, one for the development environment and another one to the production environment, why that approach could be useful, and how [Docker](https://www.Docker.com/) can help us to implement them. Also, we talk about the benefits to use Docker and why [.Net Core](https://dotnet.github.io/) is the better option to start to work with microservices. Besides, we talked about of the most popular microservice orchestrators and why we choose [Azure Service Fabric](https://azure.microsoft.com/en-us/services/service-fabric/). Finally, we explained how [Command and Query Responsibility Segregation (CQRS)](https://martinfowler.com/bliki/CQRS.html) and [Event Sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) comes into play in our architecture. In the end, we made decisions about what technologies we were going to use to implement our architecture, and the most important thing, why. So in this post we're going to understand the code, finally!
+In the [previous post](http://elvanydev.com/Microservices-part2/), we reviewed an approach, where we have two “different” architectures, one for the development environment and another one for the production environment, why that approach could be useful, and how [Docker](https://www.Docker.com/) can help us to implement them. Also, we talked about the benefits of using Docker and why [.Net Core](https://dotnet.github.io/) is the better option to start working with microservices. Besides, we talked about of the most popular microservice orchestrators and why we choose [Azure Service Fabric](https://azure.microsoft.com/en-us/services/service-fabric/). Finally, we explained how [Command and Query Responsibility Segregation (CQRS)](https://martinfowler.com/bliki/CQRS.html) and [Event Sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) comes into play in our architecture. In the end, we made decisions about what technologies we were going to use to implement our architecture, and the most important thing, why. So in this post we're going to understand the code, finally!
 
 ## Demo
 
@@ -45,25 +45,25 @@ I would like to start explaining the solution structure, as I said in the earlie
 </figure>
 
 *  **Persistence:** Contains the object(s) which takes care of persisting/read the data, they could be a [DAO](https://en.wikipedia.org/wiki/Data_access_object), EF Context, or whatever you need to interact with your data store.
-*  **Repository:** Contains our repositories (fully [Repository pattern](https://martinfowler.com/eaaCatalog/repository.html) applied), which consumes the *Persistence* layer objects, that by the way, you only must have ***one repository*** per *aggregate*.
+*  **Repository:** Contains our repositories (fully [Repository pattern](https://martinfowler.com/eaaCatalog/repository.html) applied), which consumes the *Persistence* layer objects, that by the way, you must have only ***one repository*** per *aggregate*.
 *  **Model:** Holds the objects which take care of our business logic, such as Entities, Aggregates, Value Objects, etc.
-*  **Events:** Here are placed all the domain events which our Aggregates or Entities triggers in order to communicate with other aggregates or whoever what's interested to listen to those events.
+*  **Events:** Here are placed all the domain events which our Aggregates or Entities trigger in order to communicate with other aggregates or whoever is interested to listen to those events.
 *  **Services:** A standalone operation within the context of your domain, are usually accesses to external resources and they should be stateless. A good trick to define a service, is when you have an operation which its responsibility hasn’t a clear owner, for example, our *Invoice* aggregate needs the payment information, but is it responsible to perform the payment itself? so, it seems we have a service candidate.
 *  **Commands:** You can't see it on the image, but in our *Trip* domain, we implement CQRS, so we have some commands and command handlers there, which manage the interaction between the *Event Store* and our domain through the *Aggregates*.
 
 ### Dependencies
 
-Dependencies definitively matter when we're working with microservices and you should pay attention in the way you manage their dependencies if you don't want to end up killing the autonomy of the microservice. So, speaking about implementation details, there are people who likes that everything is together in the same project which contains the microservice itself, even, there are people who likes to have a solution per microservice. In my case, I like to have a separate project for pure domain stuff, because it gives you more flexibility and achieve total decouple between your domain and the microservice implementation itself. In the end, the important thing is that your microservice ***doesn't have dependencies with other domains***, so, in our case, *Duber.Invoice.API* and *Duber.Trip.API* only have a dependency with *Duber.Domain.Invoice* and *Duber.Domain.Trip* respectively. (Also, you can have infrastructure dependencies if you need, such as service bus stuff, etc) Regarding have a solution per microservice, I think it depends on how big your team are, but if your team is small enough (5 or 6 people) I think is easier just have them together in one solution.
+Dependencies definitively matter when we're working with microservices and you should pay attention in the way you manage their dependencies if you don't want to end up killing the autonomy of the microservice. So, speaking about implementation details, there are people who like everything together in the same project which contains the microservice itself, even, there are people who like to have a solution per microservice. In my case, I like to have a separate project for pure domain stuff, because it gives you more flexibility and achieve total decoupling between your domain and the microservice implementation itself. In the end, the important thing is that your microservice ***has no dependencies with other domains***, so, in our case, *Duber.Invoice.API* and *Duber.Trip.API* only have a dependency with *Duber.Domain.Invoice* and *Duber.Domain.Trip* respectively. (Also, you can have infrastructure dependencies if you need, such as service bus stuff, etc) Regarding having a solution per microservice, I think it depends on how big your team is, but if your team is small enough (5 or 6 people) I think is just easier to have them together in one solution.
 
 ### Shared Kernel
 
-Now we're talking about dependencies, it's important to clarify the *Shared Kernel* concept. One of the downsides of DDD is the duplicate code, I mean, things like, events, value objects, enums, etc, (POCO or objects without behavior) because of the nature of DDD and the idea to make independent every bounded context, but, most of the times, it's not about duplicate code at all, since you can have, let's say, an *Invoice* object for the *Invoice context* and an *Invoice* object for *User context*, but, for both of them, the object itself is different because the needs and behavior for both context, are completely different. But, sometimes, you need a kind of contract in order all interested parties can talk the same "language", more than to avoid to duplicate code, for example in our domain, the inclusion/deletion of *Trip* status or the inclusion/deletion of *Payment* method, could introduce a lot of validations or business rules in our entire domain, which can span over bounded contexts not only the Trip but the Invoice, User and Driver bounded contexts. So, it's not about to avoid duplicate code, but to keep our domain consistent, so you would want to share those kind of things that represent the core of your system. Eric Evan says in his book: ***"The Shared Kernel cannot be changed as freely as other parts of the design. Decisions involve consultation with another team"***, because that kind of changes are not trivial, and as I said, it's not about to reduce duplication at all, it's about to make the integration between subsystem works consistently.
+Now that we're talking about dependencies, it's important to clarify the *Shared Kernel* concept. One of the downsides of DDD is the duplicate code, I mean, things like, events, value objects, enums, etc, (POCO or objects without behavior) because of the nature of DDD and the idea to make independent every bounded context, but, most of the times, it's not about duplicate code at all, since you can have, let's say, an *Invoice* object for the *Invoice context* and an *Invoice* object for *User context*, but, for both of them, the object itself is different because the needs and behavior for both context, are completely different. But, sometimes, you need kind of contract so all interested parties can talk the same "language", more than avoiding duplicate code, for example in our domain, the inclusion/deletion of *Trip* status or the inclusion/deletion of *Payment* method, could introduce a lot of validations or business rules in our entire domain, which can span over bounded contexts, not only the Trip but the Invoice, User and Driver bounded contexts. So, it's not about avoiding duplicate code, but keeping our domain consistent, so you would want to share those kind of things that represent the core of your system. Eric Evan says in his book: ***"The Shared Kernel cannot be changed as freely as other parts of the design. Decisions involve consultation with another team"***, because that kind of changes are not trivial, and as I said, it's not about reducing duplication at all, it's about making the integration between subsystem works consistently.
 
 ### Anti-Corruption layer
 
-[ACL (Anti-Corruption layer)](https://docs.microsoft.com/en-us/azure/architecture/patterns/anti-corruption-layer) is also a concept from DDD, and it help us to communicate with other systems or sub-systems which obviously are outside of our domain model, such as legacy or external systems, keeping our domain consistent and avoiding the domain becomes [anemic](https://martinfowler.com/bliki/AnemicDomainModel.html). So, basically this layer translates our domain requests as the other system requires them and translates the response from the external system back in terms of our domain, keeping our domain isolated from other systems and consistent. So, to make it happens, we're just using an [Adapter](https://en.wikipedia.org/wiki/Adapter_pattern) and a Translator/Mapper and that's it, (you will need an adapter per sub-system/external-system) also, you might need a Facade if you interact with many systems to encapsulate those complexity there and keep simple that communication from domain perspective.
+[ACL (Anti-Corruption layer)](https://docs.microsoft.com/en-us/azure/architecture/patterns/anti-corruption-layer) is also a concept from DDD, and it help us to communicate with other systems or sub-systems which obviously are outside of our domain model, such as legacy or external systems, keeping our domain consistent and avoiding the domain becomes [anemic](https://martinfowler.com/bliki/AnemicDomainModel.html). So, basically this layer translates our domain requests as the other system requires them and translates the response from the external system back in terms of our domain, keeping our domain isolated from other systems and consistent. So, to make it happen, we're just using an [Adapter](https://en.wikipedia.org/wiki/Adapter_pattern) and a Translator/Mapper and that's it (you will need an adapter per sub-system/external-system) also, you might need a Facade if you interact with many systems to encapsulate those complexity there and keep simple the communication from the domain perspective.
 
-Let's take a look at our Adapter (don't worries about  `_httpInvoker` object, we're going to explain it later)
+Let's take a look at our Adapter (don't worry about  `_httpInvoker` object, we're going to explain it later)
 
 ```c#
 public class PaymentServiceAdapter : IPaymentServiceAdapter
@@ -113,7 +113,7 @@ public class PaymentInfoTranslator
 
 ### External System
 
-Now we know how to communicate with external systems, take a look at our fake payment system.
+Now that we know how to communicate with external systems, take a look at our fake payment system.
 
 ```c#
 public class PaymentController : Controller
@@ -142,11 +142,11 @@ public class PaymentController : Controller
 }
 ```
 
-As you can see it's pretty simple, it just simulate the external payment system.
+As you can see it's pretty simple, it just to simulate the external payment system.
 
 ### Implementing CQRS + Event Sourcing
 
-As we know, we decided to use CQRS and Event Sourcing in our *Trip* microservice, so first of all, I have to say that I was looking for a good package to help me avoid to re-invent the wheel, and I found these nice packages, [Weapsy.CQRS](https://github.com/Weapsy/Weapsy.CQRS) and [Weapsy.Cqrs.EventStore.CosmosDB.MongoDB](https://www.nuget.org/packages/Weapsy.Cqrs.EventStore.CosmosDB.MongoDB) which helped me a lot and by the way, they're very easy to use. Let's get start it from the API, that's where the flow start.
+As we know, we decided to use CQRS and Event Sourcing in our *Trip* microservice, so first of all, I have to say that I was looking for a good package to help me to not re-invent the wheel, and I found these nice packages, [Weapsy.CQRS](https://github.com/Weapsy/Weapsy.CQRS) and [Weapsy.Cqrs.EventStore.CosmosDB.MongoDB](https://www.nuget.org/packages/Weapsy.Cqrs.EventStore.CosmosDB.MongoDB) which helped me a lot and by the way, they're very easy to use. Let's get started with the API, that's where the flow start.
 
 ```c#
 [Route("api/v1/[controller]")]
@@ -176,7 +176,7 @@ public class TripController : Controller
 }
 ```
 
-The most important thing here is the `_dispatcher` object, which takes care of enqueue our commands (in this case, in memory), triggers the command handlers, which interacts with our domain, through the Aggregates, and then, publish our domain events triggered from Aggregates and Entities in order publish them in our Message Broker. No worries if it sounds a kind of complicated, let's check every step.
+The most important thing here is the `_dispatcher` object, which takes care of queuing our commands (in this case, in memory), triggers the command handlers, which interacts with our domain, through the Aggregates, and then, publish our domain events triggered from Aggregates and Entities in order to publish them in our Message Broker. No worries if it sounds kind of complicated, let's check every step.
 
 * **Command Handlers**
 
@@ -248,7 +248,7 @@ public class Trip : AggregateRoot
 }
 ```
 
-So, the `AddEvent` method, enqueue a domain event which is published when the `Dispatcher` processes the command and save the event in our *Event Store*, in this case into MongoDB. So, when the event is published, we process that event through the *Domain Event Handlers*, let's check it out.
+So, the `AddEvent` method, queues a domain event which is published when the `Dispatcher` processes the command and save the event in our *Event Store*, in this case into MongoDB. So, when the event is published, we process that event through the *Domain Event Handlers*, let's check it out.
 
 * **Domain Event Handlers**
 
@@ -270,9 +270,9 @@ public class TripCreatedDomainEventHandlerAsync : IEventHandlerAsync<TripCreated
 }
 ```
 
-Therefore, after a Trip is created we want to notify all the interested parties through the `Event Bus`. We need to map the `TripCreatedDomainEvent` to `TripCreatedIntegrationEvent` due to the first one is an implementation of *Weapsy.CQRS* library and the second one, it's the implementation of the integration events which our Event Bus expect it.
+Therefore, after a Trip is created we want to notify all the interested parties through the `Event Bus`. We need to map the `TripCreatedDomainEvent` to `TripCreatedIntegrationEvent` the first one is an implementation of *Weapsy.CQRS* library and the second one, it's the implementation of the integration events which our Event Bus expects.
 
-> It's important to remember that using an Event Store we don't save the object state as usual in a RDBMS or NoSQL database, we save a series of events that enable us to retrieve the current state of the object or even a certain state within a some point of the time.
+> It's important to remember that using an Event Store we don't save the object state as usual in a RDBMS or NoSQL database, we save a series of events that enable us to retrieve the current state of the object or even a certain state at some point in time.
 
 When we retrieve an object from our Event Store, we're re-building the object with all the past events, behind the scenes. That's why we have some methods called `Apply` into the aggregates, because that's how, in this case, *Weapsy.Cqrs.EventStore* re-creates the object, calling these methods for every event of the aggregate.
 
@@ -304,11 +304,11 @@ public class Trip : AggregateRoot
 }
 ```
 
-> As a bonus code, I made an [API](https://github.com/vany0114/microservices-dotnetcore-docker-servicefabric/blob/master/src/Application/Duber.Trip.API/Controllers/EventStoreController.cs) to take advantage to our Event Store (remember, Event Store is read-only, is immutable, it's a source of truth), so think about how helpful and worthwhile it could be, take a look at this [awesome post](https://docs.microsoft.com/en-us/azure/architecture/patterns/event-sourcing) to understand the pros and cons about Event Sourcing.
+> As a bonus code, I made an [API](https://github.com/vany0114/microservices-dotnetcore-docker-servicefabric/blob/master/src/Application/Duber.Trip.API/Controllers/EventStoreController.cs) to take advantage of our Event Store (remember, Event Store is read-only, is immutable, it's a source of truth), so think about how helpful and worthwhile it could be, take a look at this [awesome post](https://docs.microsoft.com/en-us/azure/architecture/patterns/event-sourcing) to understand the pros and cons about Event Sourcing.
 
 * **Domain Event Handlers with MediatR**
 
-As I said earlier, we are using `Weapsy.CQRS` in our *Trip* microservice to manage CQRS stuff, among them, domain events/handlers. But we still to manage domain events/handlers in our *Invoice* microservice, that's why we're going to use [MediatR](https://github.com/jbogard/MediatR) to manage them. So, the idea is the same as described earlier, we have domain events which are dispatched through a dispatcher to all interested parties. So, the idea is pretty simple, we have an abstraction of an `Entity` who is the one that publish domain events in our domain model (remember, an `Aggregate` is an `Entity` as well). So, every time an *Entity* calls `AddDomainEvent` method, we're just storing the event in memory.
+As I said earlier, we are using `Weapsy.CQRS` in our *Trip* microservice to manage CQRS stuff, among them, domain events/handlers. But we still to manage domain events/handlers in our *Invoice* microservice, that's why we're going to use [MediatR](https://github.com/jbogard/MediatR) to manage them. So, the idea is the same as described earlier, we have domain events which are dispatched through a dispatcher to all interested parties. So, the idea is pretty simple, we have an abstraction of an `Entity` which is the one that publishes domain events in our domain model (remember, an `Aggregate` is an `Entity` as well). So, every time an *Entity* calls `AddDomainEvent` method, we're just storing the event in memory.
 
 ```c#
 public abstract class Entity
@@ -373,7 +373,7 @@ As you can see, we're calling `DispatchDomainEventsAsync` method just after save
 
 ### Making our system resilient
 
-Handles temporary errors properly in a distributed system is a key piece in order to guarantee resilience, and even more, when it comes to a cloud architecture. 
+Handling temporary errors properly in a distributed system is a key piece in order to guarantee resilience, and even more, when it comes to a cloud architecture. 
 
 * **EF Core:** So, let's start talking about [EF Core](https://docs.microsoft.com/en-us/dotnet/standard/microservices-architecture/implement-resilient-applications/implement-resilient-entity-framework-core-sql-connections), that by the way, it's pretty easy, due to its Retrying Execution Strategy. (We're using EF Core in our User and Driver bounded context, and also to implement our materialized view)
 
@@ -391,7 +391,7 @@ services.AddDbContext<UserContext>(options =>
 ```
 Also, you can customize [your own execution strategies](https://docs.microsoft.com/en-us/ef/core/miscellaneous/connection-resiliency#custom-execution-strategy) if you need it.
 
-* **Taking advantage of Polly:** [Polly](https://github.com/App-vNext/Polly) it's a pretty cool library which help us to create our own policies in order to manage strategies for transient errors, such as retry, circuit breaker, timeout, fallback, etc. So, in our case, we're using *Polly* to improve the Http communication in order to communicate our frontend with our *Trip* microservice, and as you saw earlier, to communicate the *Invoice* microservice with the *Payment* external system. So, I made a very basic `ResilientHttpInvoker`, using [RestSharp](http://restsharp.org), that's a great Http client.
+* **Taking advantage of Polly:** [Polly](https://github.com/App-vNext/Polly) it's a pretty cool library which help us to create our own policies in order to manage strategies for transient errors, such as retry, circuit breaker, timeout, fallback, etc. So, in our case, we're using *Polly* to improve the Http communication in order to communicate our frontend with our *Trip* microservice, and as you saw earlier, to communicate the *Invoice* microservice with the *Payment* external system. So, I made a very basic `ResilientHttpInvoker`, using [RestSharp](http://restsharp.org), which is a great Http client.
 
 ```c#
 public class ResilientHttpInvoker
@@ -423,7 +423,7 @@ public class ResilientHttpInvoker
     }
 }
 ```
-And we have a factory who is in charge to create the `ResilientHttpInvoker` with the policies that we need to takes care to.
+And we have a factory who is in charge of creating the `ResilientHttpInvoker` with the policies that we need to take care of.
 ```c#
 public class ResilientHttpInvokerFactory
 {
@@ -569,7 +569,7 @@ public class InvoiceContext : IInvoiceContext
 }
 ```
 
-* **Service Bus:** The use of a message broker, doesn't guarantee resilience itself, but it could help us a lot if we use it in a correct way. Usually message brokers have features to manage the *Time to live* for messages and also the *Message acknowledgment*, in our case, we're using [RabbitMQ](https://www.rabbitmq.com/) and [Azure Service Bus](https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-fundamentals-hybrid-solutions), both of them, offer us those capabilities. So, basically the *Time to live* feature allows us to keep our messages stored in the queues for a determined time and the *Message acknowledgment* feature allows us to make sure when really the consumer processed correctly the message, and then, only in that case, the message broker should get rid of that message. So, think about this, you could have a problem with your workers which read the queues, or clients which are subscribed to the topics, or even, those clients could receive the messages but something went wrong and the message couldn't be processed, thus, we wouldn't like to lose those messages, we would like to preserve those messages and process them successfully when we had fixed the problem or the transient error has gone.
+* **Service Bus:** The use of a message broker doesn't guarantee resilience itself, but it could help us a lot if we use it in a correct way. Usually message brokers have features to manage the *Time to live* for messages and also the *Message acknowledgment*, in our case, we're using [RabbitMQ](https://www.rabbitmq.com/) and [Azure Service Bus](https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-fundamentals-hybrid-solutions), both of them, offer us those capabilities. So, basically the *Time to live* feature allows us to keep our messages stored in the queues for a determined time and the *Message acknowledgment* feature allows us to make sure when really the consumer processed correctly the message, and then, only in that case, the message broker should get rid of that message. So, think about this, you could have a problem with your workers which read the queues, or clients which are subscribed to the topics, or even, those clients could receive the messages but something went wrong and the message couldn't be processed, thus, we wouldn't like to lose those messages, we would like to preserve those messages and process them successfully when we have fixed the problem or the transient error has gone.
 
 ```c#
 public class EventBusRabbitMQ : IEventBus, IDisposable
@@ -643,7 +643,7 @@ Notice that we have a TTL of one minute for messages: `properties.Expiration = "
 
 ### Updating the Materialized view
 
-Remember that the materialized view is our *Query* side of CQRS implementation, the *Command* side is performed from *Trip* microservice. So, we have a materialized view into *Deuber Website Database*, which summarize in one single record per trip, all the information related with the trip, such as user, driver, invoice, payment and obviously the trip information. That's why the `Duber.WebSite` project has subscribed to the integrations events which comes from *Trip* and *Invoice* microservices.
+Remember that the materialized view is our *Query* side of CQRS implementation, the *Command* side is performed from *Trip* microservice. So, we have a materialized view into *Duber Website Database*, which summarizes in one single record per trip, all the information related with the trip, such as user, driver, invoice, payment and obviously the trip information. That's why the `Duber.WebSite` project has subscribed to the integrations events which comes from *Trip* and *Invoice* microservices.
 
 ```c#
 public class Startup
@@ -661,7 +661,7 @@ public class Startup
 }
 ```
 
-As you can see, we're receiving notifications when a *Trip* is **created** or **updated**, also when an *Invoice* is **created** or **paid**. Let's take a look at some event handlers whichs take care of to update the materialized view.
+As you can see, we're receiving notifications when a *Trip* is **created** or **updated**, also when an *Invoice* is **created** or **paid**. Let's take a look at some event handlers which take care of updating the materialized view.
 
 ```c#
 public class InvoiceCreatedIntegrationEventHandler: IIntegrationEventHandler<InvoiceCreatedIntegrationEvent>
@@ -734,7 +734,7 @@ public class TripCreatedIntegrationEventHandler : IIntegrationEventHandler<TripC
 }
 ```
 
-Notice that we're throwing an `InvalidOperationException` in order to tell the `EventBus` that we couldn't process the message. So, all the information the we show from `Duber.WebSite` comes from the materialized view, which is more efficient than retrieve the information every time we need it from the microservices Api's, process it, mapping it and display it.
+Notice that we're throwing an `InvalidOperationException` in order to tell the `EventBus` that we couldn't process the message. So, all the information we show from `Duber.WebSite` comes from the materialized view, which is more efficient than retrieving the information every time we need it from the microservices Api's, process it, map it and display it.
 
 ### A glance into a Docker Compose
 
@@ -792,7 +792,7 @@ services:
       dockerfile: ExternalSystem/PaymentService/Dockerfile
 ```
 
-As you can see, the `duber.website` image depends on `duber.invoice.api`, `duber.trip.api`, `sql.data` and `rabbitmq` images, which means, `duber.website` will not start until all those containers has already started. Also, with Docker Compose you can target multiple environments, for now, we're going to take a look at the `docker-compose.override.yml` which is for development environment by default.
+As you can see, the `duber.website` image depends on `duber.invoice.api`, `duber.trip.api`, `sql.data` and `rabbitmq` images, which means, `duber.website` will not start until all those containers have already started. Also, with Docker Compose you can target multiple environments, for now, we're going to take a look at the `docker-compose.override.yml` which is for development environments by default.
 
 ```yml
 services:
@@ -841,6 +841,6 @@ services:
       - "32777:80"
 ```
 
->All environment variables defined here, will be override the ones defined in the settings file on their respective projects.
+>All environment variables defined here, will override the ones defined in the settings file on their respective projects.
 
-So, in the end, this is only a containerized application, for now, but, have in mind that this way, our solution is ready to be deployed and consume as microservices, thanks to we’ve followed all patterns and good practices to work successfully with distributed systems such microservices. So, stay tune, because in our next and last post, we’re going to deploy our application, using *Azure Service Fabric*, and others resources on cloud, such *Azure Service Bus*, *Azure Sql Database* and *CosmosDB*. I hope you’re enjoying this topic as much as me and also hope it will be helpful!
+So, in the end, this is only a containerized application, for now, but, have in mind that this way, our solution is ready to be deployed and consumed as microservices, as we followed all patterns and good practices to work successfully with distributed systems as microservices. So, stay tuned, because in our next and last post, we’re going to deploy our application using *Azure Service Fabric* and others resources on cloud, such as *Azure Service Bus*, *Azure Sql Database* and *CosmosDB*. I hope you’re enjoying this topic as much as me and also hope it will be helpful!
