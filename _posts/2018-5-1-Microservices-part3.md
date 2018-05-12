@@ -13,7 +13,7 @@ In the [previous post](http://elvanydev.com/Microservices-part2/), we reviewed a
 #### Prerequisites and Installation Requirements
 1. Install [Docker for Windows](https://docs.docker.com/docker-for-windows/install/).
 2. Install [.NET Core SDK](https://www.microsoft.com/net/download/windows)
-3. Install [Visual Studio 2017](https://www.visualstudio.com/downloads/) 15.5 or later.
+3. Install [Visual Studio 2017](https://www.visualstudio.com/downloads/) 15.7 or later.
 4. Share drives in Docker settings (In order to deploy and debug with Visual Studio 2017)
 5. Clone this [Repo](https://github.com/vany0114/microservices-dotnetcore-docker-servicefabric)
 6. Set `docker-compose` project as startup project. (it's already set by default)
