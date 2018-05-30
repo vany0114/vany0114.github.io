@@ -37,3 +37,32 @@ This script just creates the MongoDB which is used by Trip microservice. You can
 
 ## Building and publishing Docker Images
 
+The next step is to build and publish the images to a [Docker Registry](https://hub.docker.com), in this case, we're going to use the public one, but if you have to keep private your images you can use a private registry on Docker or even in [Azure Container Registry](https://azure.microsoft.com/en-us/services/container-registry/). So, a registry is basically a place where you store and distribute your Docker images. 
+
+Unlike the development environment where we were using an image for every component (SQL Server, RabbitMQ, MongoDB, WebSite, Payment Api, Trip Api and Invoice Api, in total 7 images), in our production environment we only going to have 2 images, which are going to be our microservices, the *Trip* and *Invoice* API's which in the end are going to be deployed in every node in our Service Fabric cluster.
+
+First of all, we need to take in mind that there are several images that we're using to build our own images, either for develop and production environments. So, for Asp.Net Core applications, Microsoft has mainly two different images, [aspnetcore](https://hub.docker.com/r/microsoft/aspnetcore/) and [aspnetcore-build](https://hub.docker.com/r/microsoft/aspnetcore-build/), the main difference is the first one is optimized for production environments since it only has the runtime, while the other one contains the .Net Core SDK, Nuget Package client, Node.js, Bower and Gulp, so, for obvious reasons, the second one is much larger than the first one. Having said that, in a development environment the size of the image doesn't matter, but in production environment, when the cluster is going to be constantly creating instances dynamically to scale up, we need the size of the image will be small enough in order to improve the network performance when the Docker host is pulling the image down from Docker registry, also the docker host shouldn't spend time restore packages and compile at runtime, it's the opposite, it should be ready to run the container and that's it. Fortunately, Visual Studio takes care of that for us, let’s going to understand the  `DockerFile`.
+
+```docker
+FROM microsoft/aspnetcore:2.0 AS base
+WORKDIR /app
+EXPOSE 80
+
+FROM microsoft/aspnetcore-build:2.0 AS build
+WORKDIR /src
+COPY microservices-netcore-docker-servicefabric.sln ./
+COPY src/Application/Duber.Trip.API/Duber.Trip.API.csproj src/Application/Duber.Trip.API/
+RUN dotnet restore -nowarn:msb3202,nu1503
+COPY . .
+WORKDIR /src/src/Application/Duber.Trip.API
+RUN dotnet build -c Release -o /app
+
+FROM build AS publish
+RUN dotnet publish -c Release -o /app
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app .
+ENTRYPOINT ["dotnet", "Duber.Trip.API.dll"]
+```
+Visual Studio uses a [Docker Multi-Stage build](https://docs.docker.com/develop/develop-images/multistage-build/) which is the easiest and recommended way to build an optimized image avoiding create intermediate images and reducing significantly the complexity. So, every `FROM` is a stage of the build and each `FROM` can use a different base image. In this example, we have four stages, the first one pulls down the `microsoft/aspnetcore:2.0` image, the second one, performs the packages restore and build the solution, the third one, publish the artifacts and the final stage, it's actually the one that builds the image, the important thing here, is that it's using the `base` stage as the base image, which is actually the optimized one, and it's taking the binaries (compiled artifacts) from `publish` stage.
