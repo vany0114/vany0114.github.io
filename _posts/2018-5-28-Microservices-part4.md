@@ -102,3 +102,86 @@ Finally, we push the images to Docker Registry, you can see these images on my [
 
 ## Creating the Service Fabric Cluster
 
+Now, we need a place where to deploy our Docker images, that's why we're going to create an Azure Service Fabric cluster, which is going to be our Microservices orchestrator. Service Fabric helps to abstract a lot of concerns about networking and infrastructure and you can create your cluster using the [Azure portal](https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-cluster-creation-via-portal) if you prefer, but in this case, we're going to create it using a script through the Azure CLI. Basically, this command creates a cluster based on Linux nodes, more specifically, with five nodes.
+
+`create-resources.cmd servicefabric\LinuxContainers\servicefabricdeploy duber-rs-group`
+
+Besides of the cluster itself, it creates a Load Balancer, a Public IP, a Virtual Network, etc. all these pieces work together and they're managed by Service Fabric Cluster.
+
+## Deploying microservices on Service Fabric Cluster
+
+After we have a Service Fabric cluster working on Azure, is pretty easy deploy our images, we only need a Service Fabric container application project, and that's it. 
+
+<figure>
+  <img src="{{ '/images/servicefabric-project.png' | prepend: site.baseurl }}" alt=""> 
+  <figcaption>Fig1. - Service Fabric Container Project</figcaption>
+</figure>
+
+As you can see on the image, we have two Service Fabric Services, *Invoice* and *Trip*, let's take a look at the `ServiceManifest.xml` which is the most important file.
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<ServiceManifest Name="TripPkg">
+  <ServiceTypes>
+    <!-- This is the name of your ServiceType.
+         The UseImplicitHost attribute indicates this is a guest service. -->
+    <StatelessServiceType ServiceTypeName="TripType" UseImplicitHost="true" />
+  </ServiceTypes>
+  <!-- Code package is your service executable. -->
+  <CodePackage Name="Code" Version="1.0.0">
+    <EntryPoint>
+      <ContainerHost>
+        <ImageName>vany0114/duber.trip.api:prod</ImageName>
+      </ContainerHost>
+    </EntryPoint>
+    <!-- Pass environment variables to your container: -->
+    <EnvironmentVariables>
+      <EnvironmentVariable Name="ASPNETCORE_ENVIRONMENT" Value="Production"/>
+      <EnvironmentVariable Name="ASPNETCORE_URLS" Value="http://0.0.0.0:80"/>
+      <EnvironmentVariable Name="EventStoreConfiguration__ConnectionString" Value="Your connection string"/>
+      <EnvironmentVariable Name="EventBusConnection" Value="Your connection string"/>
+      <EnvironmentVariable Name="AzureServiceBusEnabled" Value="True"/>
+    </EnvironmentVariables>
+  </CodePackage>
+  <Resources>
+    <Endpoints>
+      <Endpoint Name="TripTypeEndpoint" Port="5103" UriScheme="http" />
+    </Endpoints>
+  </Resources>
+</ServiceManifest>
+```
+So, if you see, the entry point is our Docker image, so, we need to specify the user, repository and the label in order to Service Fabric download the image from Docker Registry, also if you need to override some environment variable, you can do it, specifying the name and the value in the `EnvironmentVariables` section. Last but not least, it's the `Endpoint`, you need to specify the port, which is the one what we talked about earlier, when we were speaking about `TRIP_SERVICE_BASE_URL` environment variable. So, in the end, this port is your access door to your service.
+
+There are a couple of files that we need to talk about, `ApplicationParameters/Cloud.xml` and `PublishProfiles/Cloud.xml`, the first one is used to pass the number of instances per microservice and in the second one, we need to configure the connection endpoint of our service fabric cluster.
+
+This is the `ApplicationParameters/Cloud.xml` and this configuration means that we're going to have five *Invoice* microservices instances and five *Trip* microservices instances. 
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Application Name="fabric:/DuberMicroservices">
+  <Parameters>
+    <Parameter Name="Invoice_InstanceCount" Value="5" />
+    <Parameter Name="Trip_InstanceCount" Value="5" />
+  </Parameters>
+</Application>
+```
+
+This is the `PublishProfiles/Cloud.xml`, you need to configure the connection endpoint, you can find it on the cluster information on the Azure portal as you can see in the next image.
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<PublishProfile xmlns="http://schemas.microsoft.com/2015/05/fabrictools">
+  <ClusterConnectionParameters ConnectionEndpoint="yourclustrendpoint" />
+</PublishProfile>
+```
+<figure>
+  <img src="{{ '/images/servicefabric-conf.png' | prepend: site.baseurl }}" alt=""> 
+  <figcaption>Fig2. - Service Fabric connection endpoint</figcaption>
+</figure>
+
+So, after we complete that configuration, we only have to publish `DuberMicroservices` project, and that's it, our docker images going to be deployed in every node in the cluster.
+
+This is how looks like the cluster with our microservices, that's a very cool dashboard where we can monitor our cluster, nodes and microservices.
+
+<figure>
+  <img src="{{ '/images/servicefabric-explorer.png' | prepend: site.baseurl }}" alt=""> 
+  <figcaption>Fig2. - Service Fabric expolorer</figcaption>
+</figure>
