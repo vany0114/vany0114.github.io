@@ -80,6 +80,7 @@ plugins:
   - jekyll-seo-tag
   - jekyll-paginate
   - jekyll-assets
+  - jemoji
 
 # Exclude these files from your production _site
 exclude:
