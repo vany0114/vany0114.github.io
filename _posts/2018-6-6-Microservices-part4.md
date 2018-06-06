@@ -241,3 +241,11 @@ Last but not least, you can see that the microservices based application process
 ## Conclusion
 
 We have seen the challenges of coding microservices based applications, the concerns about infrastructure and the complexity to communicate all microservices to each other, but we have seen how worthwhile microservices are and the great advantages that they can give us in our applications, such as high performance, high availability, reliability, scalability, and so on, which mean, the effort of a microservice architecture, in the end it's worth it, so, this was a basic example, but despite that we could see a tremendous difference between monolithic and microservices based applications in action. But there are more challenges, like Continuous Integration, Continuous Delivery, security, monitoring...but that's another story. I hope you were enjoyed as much as me in these series of posts about these so interesting topics and I expect it will help you, also, I encourage you to improve this solution adding an API Gateway or a Service Mesh or whatever you think will be better. In the meantime, stay tuned to my blog. :smiley: :metal:
+
+## References
+These are the main references which I inspired from and learned about the topics that we talked about in these series of posts:
+* [Domain-Driven Design: Tackling Complexity in the Heart of Software](https://www.amazon.com/Domain-Driven-Design-Tackling-Complexity-Software/dp/0321125215) - Eric Evans
+* [CQRS Journey](https://docs.microsoft.com/en-us/previous-versions/msp-n-p/jj554200(v=pandp.10)) - Microsoft
+* [Patterns of Enterprise Application Architecture](https://martinfowler.com/books/eaa.html) - Martin Fowler
+* [Microservices Patterns](https://www.manning.com/books/microservices-patterns) - Chris Richardson
+* [Microservices & Docker](https://www.microsoft.com/net/download/thank-you/microservices-architecture-ebook) - Microsoft
