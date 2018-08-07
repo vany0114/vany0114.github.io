@@ -308,7 +308,7 @@ public class Trip : AggregateRoot
 
 * **Domain Event Handlers with MediatR**
 
-As I said earlier, we are using `Weapsy.CQRS` in our *Trip* microservice to manage CQRS stuff, among them, domain events/handlers. But we still to manage domain events/handlers in our *Invoice* microservice, that's why we're going to use [MediatR](https://github.com/jbogard/MediatR) to manage them. So, the idea is the same as described earlier, we have domain events which are dispatched through a dispatcher to all interested parties. So, the idea is pretty simple, we have an abstraction of an `Entity` which is the one that publishes domain events in our domain model (remember, an `Aggregate` is an `Entity` as well). So, every time an *Entity* calls `AddDomainEvent` method, we're just storing the event in memory.
+As I said earlier, we are using `Weapsy.CQRS` in our *Trip* microservice to manage CQRS stuff, among them, domain events/handlers. But we still have to manage domain events/handlers in our *Invoice* microservice, that's why we're going to use [MediatR](https://github.com/jbogard/MediatR) to manage them. So, the idea is the same as described earlier, we have domain events which are dispatched through a dispatcher to all interested parties. So, the idea is pretty simple, we have an abstraction of an `Entity` which is the one that publishes domain events in our domain model (remember, an `Aggregate` is an `Entity` as well). So, every time an *Entity* calls `AddDomainEvent` method, we're just storing the event in memory.
 
 ```c#
 public abstract class Entity
