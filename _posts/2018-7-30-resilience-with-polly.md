@@ -31,11 +31,26 @@ At the end of the day, if we are guarantying resiliency, implicitly we are guara
 
 ## Getting Started
 
-I won’t explain the basic concepts/usages of every feature of Polly because the guys of Polly project already have a great documentation and examples for those purposes, my intention is to show you how to build consistent and powerful resilient strategies based on real scenarios and also share with you my experience with Polly, which have been great so far, by the way.
+I won’t explain the basic concepts/usages of every feature of Polly because the guys of Polly project already have a great [documentation and examples](https://github.com/App-vNext/Polly/wiki), my intention is to show you how to build consistent and powerful resilient strategies based on real scenarios and also share with you my experience with Polly, which have been great so far, by the way.
 
 So, we’re going to build a resilient strategy for SQL executions, more specifically, for Azure SQL Databases, but at the end of this post, you will see that you could build your own strategies for whatever resource or process you need to consume following the pattern which I’m going to purpose, for instance, you could have a resilient strategy for Azure Service Bus, Redis or Elasticsearch executions, etc. The idea is to build specialized strategies since all of them have different transient errors and thus, different ways to handle them. Let’s get started!
 
 ### Choosing the transient errors
 
 The first thing we need to care about is be aware what are the transient errors for the API/Resource we're going to consume, in order to choose what are the ones we're going to handle. Generally, we can find them in the official documentation of the API. In our case, we're going to pick up some transient errors, based on the [official documentation of Azure SQL Databases](https://docs.microsoft.com/en-us/azure/sql-database/sql-database-develop-error-messages).
+
+* **40613:** Database is not currently available.
+* **40197:** Error processing the request, you receive this error when the service is down due to software or hardware upgrades, hardware failures, or any other failover problems. 
+* **40501:** The service is currently busy.
+* **49918:** Not enough resources to process request.
+* **40549:** Session is terminated because you have a long-running transaction.
+* **40550:** The session has been terminated because it has acquired too many locks.
+
+So, in our example, we're going to handle the above Sql exceptions, but, of course, you can handle the exceptions as you need.
+
+### The power of PolicyWrap
+
+As I said earlier, I won't explain the basics of Polly, but we can say ~~I would say~~ that the building block of Polly are the policies. So, what's a policy? well, I would say a policy is the minimum unit of resilience. Having said that, Polly offers multiple resilience policies, such as [Retry](https://github.com/App-vNext/Polly/wiki/Retry), [Circuit-breaker](https://github.com/App-vNext/Polly/wiki/Circuit-Breaker), [Timeout](https://github.com/App-vNext/Polly/wiki/Timeout), [Bulkhead Isolation](https://github.com/App-vNext/Polly/wiki/Bulkhead), [Cache](https://github.com/App-vNext/Polly/wiki/Cache) and [Fallback](https://github.com/App-vNext/Polly/wiki/Fallback), which can be used individually to handle specific scenarios, but when you put them together, you can achieve a powerful resilient strategy, and here is where [PolicyWrap](https://github.com/App-vNext/Polly/wiki/PolicyWrap) comes into play.
+
+PolicyWrap enables us to wrap and combine single policies in a nested fashion in order to build a powerful and consistent resilient strategy. So, Thik about this scenario: 
 
