@@ -16,7 +16,7 @@ Nowadays with the power of cloud computing and all of its advantages, we can bui
 * And the most obvious reason, is the network condition, especially when communication crosses the Internet. So, very heavy traffic loads may slow communication, introduce additional connection latency and cause intermittent connection failures.
 
 ## Challenges
-In order to achieve resilience your application must able to respond to the following challenges:
+In order to achieve resilience, your application must able to respond to the following challenges:
 
 * Determine when a fault is likely to be transient or a terminal one. 
 * Retry the operation if it determines that the fault is likely to be transient and keep track of the number of times the operation was retried.
@@ -31,7 +31,7 @@ At the end of the day, if we are guarantying resiliency, implicitly we are guara
 
 ## Getting Started
 
-I won’t explain the basic concepts/usages of every feature of Polly because the guys of Polly project already have a great [documentation and examples](https://github.com/App-vNext/Polly/wiki), my intention is to show you how to build consistent and powerful resilient strategies based on real scenarios and also share with you my experience with Polly, which have been great so far, by the way.
+I won’t explain the basic concepts/usages of every feature of Polly because the guys of Polly project already have a great [documentation and examples](https://github.com/App-vNext/Polly/wiki), my intention is to show you how to build consistent and powerful resilient strategies based on real scenarios and also share with you, my experience with Polly, which have been great so far, by the way.
 
 So, we’re going to build a resilient strategy for SQL executions, more specifically, for Azure SQL Databases, but at the end of this post, you will see that you could build your own strategies for whatever resource or process you need to consume following the pattern which I’m going to purpose, for instance, you could have a resilient strategy for Azure Service Bus, Redis or Elasticsearch executions, etc. The idea is to build specialized strategies since all of them have different transient errors and thus, different ways to handle them. Let’s get started!
 
@@ -54,7 +54,14 @@ As I said earlier, I won't explain the basics of Polly, but we can say ~~I would
 
 PolicyWrap enables us to wrap and combine single policies in a nested fashion in order to build a powerful and consistent resilient strategy. So, Think about this scenario: 
 
-*When a SQL transient error happens, you need to retry for maximum 5 times but, for every attempt, you need to wait exponentially, for example, the first attempt will wait for 2 seconds, the second attempt will wait for 4 seconds, etc. But you don’t want to waste resources for the new incoming requests, waiting and retrying when you already have retried 3 times and the error persists, instead, you want to fail faster and say to the new requests: “Stop doing it, it hurts” for 2 seconds. It means, after the third attempt, for the next 2 seconds, every request to that resource will fail fast instead to try to perform the action. Also, given that we’re waiting for an exponential period of time in every attempt, in the worst case, which is the fifth attempt, we will have waited more than 60 seconds + the time it takes the action itself, so, we don't want to wait "forever", instead, let’s say, we're willing to wait up to 2 minutes trying to execute an action, thus, we need an overal timeout for 2 minutes. Finally, if the action failed either because it exceeded the maximum retries or it turned out the error wasn't transient or it took more than 2 minutes, we need a way to degrade gracefully, it means, a last alternative when everything goes wrong.*
+*When a SQL transient error happens, you need to retry for maximum 5 times but, for every attempt, you need to wait exponentially, for example, the first attempt will wait for 2 seconds, the second attempt will wait for 4 seconds, etc. before to try it again. But, you don’t want to waste resources for the new incoming requests, waiting and retrying when you already have retried 3 times and you know the error persists, instead, you want to fail faster and say to the new requests: “Stop doing it, it hurts, I need a break for 2 seconds". It means, after the third attempt, for the next 2 seconds, every request to that resource will fail fast instead to try to perform the action. Also, given that we’re waiting for an exponential period of time in every attempt, in the worst case, which is the fifth attempt, we will have waited more than 60 seconds + the time it takes the action itself, so, we don't want to wait "forever", instead, let’s say, we're willing to wait up to 2 minutes trying to execute an action, thus, we need an overal timeout for 2 minutes. Finally, if the action failed either because it exceeded the maximum retries or it turned out the error wasn't transient or it took more than 2 minutes, we need a way to degrade gracefully, it means, a last alternative when everything goes wrong.*
 
-So, if you noticed, to achieve a consistent resilient strategy to handle that scenario, we will need at least 4 policies, such as [Retry](https://github.com/App-vNext/Polly/wiki/Retry), [Circuit-breaker](https://github.com/App-vNext/Polly/wiki/Circuit-Breaker), [Timeout](https://github.com/App-vNext/Polly/wiki/Timeout) and, [Fallback](https://github.com/App-vNext/Polly/wiki/Fallback) but, working as one single policy. Let's see how the flow of our policy will look like to understand better how it will work:
+So, if you noticed, to achieve a consistent resilient strategy to handle that scenario, we will need at least 4 policies, such as [Retry](https://github.com/App-vNext/Polly/wiki/Retry), [Circuit-breaker](https://github.com/App-vNext/Polly/wiki/Circuit-Breaker), [Timeout](https://github.com/App-vNext/Polly/wiki/Timeout) and, [Fallback](https://github.com/App-vNext/Polly/wiki/Fallback) but, working as one single policy instead of individually every one of them. Let's see how the flow of our policy will look like to understand better how it will work:
+
+<figure>
+  <img src="{{ '/images/PollyStrategy.png' | prepend: site.baseurl }}" alt=""> 
+  <figcaption>Fig1. - Resilient strategy flow</figcaption>
+</figure>
+
+### Let's start coding
 
