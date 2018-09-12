@@ -54,7 +54,7 @@ As I said earlier, I won't explain the basics of Polly, but we can say ~~I would
 
 PolicyWrap enables us to wrap and combine single policies in a nested fashion in order to build a powerful and consistent resilient strategy. So, Think about this scenario: 
 
-*When a SQL transient error happens, you need to retry for maximum 5 times but, for every attempt, you need to wait exponentially, for example, the first attempt will wait for 2 seconds, the second attempt will wait for 4 seconds, etc. before to try it again. But, you don’t want to waste resources for the new incoming requests, waiting and retrying when you already have retried 3 times and you know the error persists, instead, you want to fail faster and say to the new requests: “Stop doing it, it hurts, I need a break for 2 seconds". It means, after the third attempt, for the next 2 seconds, every request to that resource will fail fast instead to try to perform the action. Also, given that we’re waiting for an exponential period of time in every attempt, in the worst case, which is the fifth attempt, we will have waited more than 60 seconds + the time it takes the action itself, so, we don't want to wait "forever", instead, let’s say, we're willing to wait up to 2 minutes trying to execute an action, thus, we need an overal timeout for 2 minutes. Finally, if the action failed either because it exceeded the maximum retries or it turned out the error wasn't transient or it took more than 2 minutes, we need a way to degrade gracefully, it means, a last alternative when everything goes wrong.*
+>*When a SQL transient error happens, you need to retry for maximum 5 times but, for every attempt, you need to wait exponentially, for example, the first attempt will wait for 2 seconds, the second attempt will wait for 4 seconds, etc. before to try it again. But, you don’t want to waste resources for the new incoming requests, waiting and retrying when you already have retried 3 times and you know the error persists, instead, you want to fail faster and say to the new requests: “Stop doing it, it hurts, I need a break for 30 seconds". It means, after the third attempt, for the next 30 seconds, every request to that resource will fail fast instead to try to perform the action. Also, given that we’re waiting for an exponential period of time in every attempt, in the worst case, which is the fifth attempt, we will have waited more than 60 seconds + the time it takes the action itself, so, we don't want to wait "forever", instead, let’s say, we're willing to wait up to 2 minutes trying to execute an action, thus, we need an overal timeout for 2 minutes. Finally, if the action failed either because it exceeded the maximum retries or it turned out the error wasn't transient or it took more than 2 minutes, we need a way to degrade gracefully, it means, a last alternative when everything goes wrong.*
 
 So, if you noticed, to achieve a consistent resilient strategy to handle that scenario, we will need at least 4 policies, such as [Retry](https://github.com/App-vNext/Polly/wiki/Retry), [Circuit-breaker](https://github.com/App-vNext/Polly/wiki/Circuit-Breaker), [Timeout](https://github.com/App-vNext/Polly/wiki/Timeout) and, [Fallback](https://github.com/App-vNext/Polly/wiki/Fallback) but, working as one single policy instead of individually every one of them. Let's see how the flow of our policy will look like to understand better how it will work:
 
@@ -63,5 +63,79 @@ So, if you noticed, to achieve a consistent resilient strategy to handle that sc
   <figcaption>Fig1. - Resilient strategy flow</figcaption>
 </figure>
 
-### Let's start coding
+### Sync vs Async Policies
 
+Before to start defining the policies, we need to understand when and why use sync/async policies and the importance to do not mixing sync and async executions. Polly splits policies in Sync and Async ones, not only for the obvious reason which is, separating synchronous and asynchronous executions in order to avoid the pitfalls of [async-over-sync](https://blogs.msdn.microsoft.com/pfxteam/2012/03/24/should-i-expose-asynchronous-wrappers-for-synchronous-methods/) and [sync-over-async](https://blogs.msdn.microsoft.com/pfxteam/2012/04/13/should-i-expose-synchronous-wrappers-for-asynchronous-methods/) approaches, but for design matters, basically, because of policy hooks, it means, policies such as Retry, Circuit Breaker, Fallback, etc. expose policy hooks where users can attach delegates to be invoked on specific policy events:   `onRetry`, `onBreak`, `onFallback`, etc. but those delegates depends on the kind of execution, so, synchronous executions expect synchronous policy hooks and asynchronous executions expect asynchronous policy hooks. [This](https://github.com/App-vNext/Polly/issues/483) is an issue on Polly's repo where you can find a great explanation about what happens when you execute an async delegate through a sync policy.
+
+### Defining the Policies
+
+Having said that, we're going to define our policies for both scenarios, synchronous and asynchronous and also, as we already know, we're going to use PolicyWrap which needs two or more policies to wrap and process them as a single one. 
+
+> I'll only show you the async ones in order to simplify, but you can see the whole implementation for both, [sync](https://github.com/vany0114/resilience-strategy-with-polly/blob/master/src/Resilience.Polly.Sql/Policies/SyncPolicies.cs) and [async](https://github.com/vany0114/resilience-strategy-with-polly/blob/master/src/Resilience.Polly.Sql/Policies/AsyncPolicies.cs) ones, the differences are, that the ***sync*** ones, executes the policy ***sync overload*** and the ***async*** ones, executes the policy ***async overload***. Also, the policy hooks for fallback policies, the sync fallback expect synchronous delegate while the async fallback expects a task.
+ 
+#### Wait and Retry
+
+We need a policy that waits and retries for transient exceptions which we already chose to handle earlier. So, we're telling Polly to handle `SqlException`s but, only for very specific exception numbers. Also, we’re telling how many times it should wait for and the delay between each attempt through an exponential back-off based on the current attempt.
+
+```c#
+/// <summary>
+/// Gets a Retry policy for the most common transient error in Azure Sql.
+/// </summary>
+public static IAsyncPolicy GetCommonTransientErrorsPolicies(int retryCount) =>
+    Policy
+        .Handle<SqlException>(ex => SqlTransientErrors.Contains(ex.Number))
+        .WaitAndRetryAsync(
+            // number of retries
+            retryCount,
+            // exponential back-off
+            retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+            // on retry
+            (exception, timeSpan, retries, context) =>
+            {
+                if (retryCount != retries)
+                    return;
+
+                // only log if the final retry fails
+                var msg = $"#Polly #WaitAndRetryAsync Retry {retries}" +
+                          $"of {context.PolicyKey} " +
+                          $"due to: {exception}.";
+                Log.Error(msg, exception);
+            })
+        .WithPolicyKey(PolicyKeys.SqlCommonTransientErrorsAsyncPolicy);
+```
+
+#### Circuit Breaker
+
+We need a policy that waits and retries for transient exceptions which we already chose to handle earlier. So, we're telling Polly to handle `SqlException`s but, only for very specific exception numbers. Also, we’re telling how many times it should wait for and the delay between each attempt through an exponential back-off based on the current attempt.
+
+```c#
+public static IAsyncPolicy[] GetCircuitBreakerPolicies(int exceptionsAllowedBeforeBreaking)
+  => new IAsyncPolicy[]
+  {
+      Policy
+          .Handle<SqlException>(ex => ex.Number == (int)SqlHandledExceptions.DatabaseNotCurrentlyAvailable)
+          .CircuitBreakerAsync(
+              // number of exceptions before breaking circuit
+              exceptionsAllowedBeforeBreaking,
+              // time circuit opened before retry
+              TimeSpan.FromSeconds(30),
+              OnBreak,
+              OnReset,
+              OnHalfOpen)
+          .WithPolicyKey($"F1.{PolicyKeys.SqlCircuitBreakerAsyncPolicy}"),
+      Policy
+          .Handle<SqlException>(ex => ex.Number == (int)SqlHandledExceptions.ErrorProcessingRequest)
+          .CircuitBreakerAsync(
+              // number of exceptions before breaking circuit
+              exceptionsAllowedBeforeBreaking,
+              // time circuit opened before retry
+              TimeSpan.FromSeconds(30),
+              OnBreak,
+              OnReset,
+              OnHalfOpen)
+          .WithPolicyKey($"F2.{PolicyKeys.SqlCircuitBreakerAsyncPolicy}"),
+      .
+      .
+      .
+  };
+```
