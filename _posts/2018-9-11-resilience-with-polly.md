@@ -52,7 +52,7 @@ So, in our example, we're going to handle the above Sql exceptions, but, of cour
 
 As I said earlier, I won't explain the basics of Polly, but we can say ~~I would say~~ that the building block of Polly are the policies. So, what's a policy? well, I would say a policy is the minimum unit of resilience. Having said that, Polly offers multiple resilience policies, such as [Retry](https://github.com/App-vNext/Polly/wiki/Retry), [Circuit-breaker](https://github.com/App-vNext/Polly/wiki/Circuit-Breaker), [Timeout](https://github.com/App-vNext/Polly/wiki/Timeout), [Bulkhead Isolation](https://github.com/App-vNext/Polly/wiki/Bulkhead), [Cache](https://github.com/App-vNext/Polly/wiki/Cache) and [Fallback](https://github.com/App-vNext/Polly/wiki/Fallback), which can be used individually to handle specific scenarios, but when you put them together, you can achieve a powerful resilient strategy, and here is where [PolicyWrap](https://github.com/App-vNext/Polly/wiki/PolicyWrap) comes into play.
 
-PolicyWrap enables us to wrap and combine single policies in a nested fashion in order to build a powerful and consistent resilient strategy. So, Think about this scenario: 
+PolicyWrap enables us to wrap and combine single policies in a nested fashion in order to build a powerful and consistent resilient strategy. So, think about this scenario: 
 
 >*When a SQL transient error happens, you need to retry for maximum 5 times but, for every attempt, you need to wait exponentially, for example, the first attempt will wait for 2 seconds, the second attempt will wait for 4 seconds, etc. before to try it again. But, you don’t want to waste resources for the new incoming requests, waiting and retrying when you already have retried 3 times and you know the error persists, instead, you want to fail faster and say to the new requests: “Stop doing it, it hurts, I need a break for 30 seconds". It means, after the third attempt, for the next 30 seconds, every request to that resource will fail fast instead to try to perform the action. Also, given that we’re waiting for an exponential period of time in every attempt, in the worst case, which is the fifth attempt, we will have waited more than 60 seconds + the time it takes the action itself, so, we don't want to wait "forever", instead, let’s say, we're willing to wait up to 2 minutes trying to execute an action, thus, we need an overal timeout for 2 minutes. Finally, if the action failed either because it exceeded the maximum retries or it turned out the error wasn't transient or it took more than 2 minutes, we need a way to degrade gracefully, it means, a last alternative when everything goes wrong.*
 
@@ -69,7 +69,7 @@ Before to start defining the policies, we need to understand when and why use sy
 
 ### Defining the Policies
 
-Having said that, we're going to define our policies for both scenarios, synchronous and asynchronous and also, as we already know, we're going to use PolicyWrap which needs two or more policies to wrap and process them as a single one. 
+Having said that, we're going to define our policies for both scenarios, synchronous and asynchronous and also, as we already know, we're going to use PolicyWrap which needs two or more policies to wrap and process them as a single one. So, let's take a look at every single policy.
 
 > I'll only show you the async ones in order to simplify, but you can see the whole implementation for both, [sync](https://github.com/vany0114/resilience-strategy-with-polly/blob/master/src/Resilience.Polly.Sql/Policies/SyncPolicies.cs) and [async](https://github.com/vany0114/resilience-strategy-with-polly/blob/master/src/Resilience.Polly.Sql/Policies/AsyncPolicies.cs) ones, the differences are, that the ***sync*** ones, executes the policy ***sync overload*** and the ***async*** ones, executes the policy ***async overload***. Also, the policy hooks for fallback policies, the sync fallback expect synchronous delegate while the async fallback expects a task.
  
@@ -78,9 +78,6 @@ Having said that, we're going to define our policies for both scenarios, synchro
 We need a policy that waits and retries for transient exceptions which we already chose to handle earlier. So, we're telling Polly to handle `SqlException`s but, only for very specific exception numbers. Also, we’re telling how many times it should wait for and the delay between each attempt through an exponential back-off based on the current attempt.
 
 ```c#
-/// <summary>
-/// Gets a Retry policy for the most common transient error in Azure Sql.
-/// </summary>
 public static IAsyncPolicy GetCommonTransientErrorsPolicies(int retryCount) =>
     Policy
         .Handle<SqlException>(ex => SqlTransientErrors.Contains(ex.Number))
@@ -106,7 +103,7 @@ public static IAsyncPolicy GetCommonTransientErrorsPolicies(int retryCount) =>
 
 #### Circuit Breaker
 
-We need a policy that waits and retries for transient exceptions which we already chose to handle earlier. So, we're telling Polly to handle `SqlException`s but, only for very specific exception numbers. Also, we’re telling how many times it should wait for and the delay between each attempt through an exponential back-off based on the current attempt.
+With this policy, we're telling Polly that after a determined number of exceptions in a row, it should fail fast and should keep open the circuit for 30 seconds. As you can see, there's a difference in the way that we handle the exceptions, in this case, we have one single circuit breaker for each exception, due to circuit breaker policy counts all faults they handle as an aggregate, not separately. So, we only want breaking the circuit after N consecutive actions executed through the policy have thrown a handled exception, let's say `DatabaseNotCurrentlyAvailable` exception, and not for ***any*** of the exceptions handled by the policy. You can check [this](https://github.com/App-vNext/Polly/issues/490) out on Polly's repo.
 
 ```c#
 public static IAsyncPolicy[] GetCircuitBreakerPolicies(int exceptionsAllowedBeforeBreaking)
@@ -139,3 +136,186 @@ public static IAsyncPolicy[] GetCircuitBreakerPolicies(int exceptionsAllowedBefo
       .
   };
 ```
+
+#### Timeout
+
+We're using a [pessimistic strategy](https://github.com/App-vNext/Polly/wiki/Timeout#pessimistic-timeout) for our timeout policy, which means, it will cancel delegates which have no in-built timeout, and do not honor cancellation. So, this strategy enforces a timeout, guaranteeing still returning to the caller on timeout.
+
+```c#
+public static IAsyncPolicy GetTimeOutPolicy(TimeSpan timeout, string policyName) =>
+    Policy
+        .TimeoutAsync(
+            timeout,
+            TimeoutStrategy.Pessimistic)
+        .WithPolicyKey(policyName);
+```
+
+#### Fallback
+
+As we defined earlier, we need a last chance when everything goes wrong, that's why we're handling not only the `SqlException` but `TimeoutRejectedException` and `BrokenCircuitException`. That means, if our execution fails either due to the circuit is broken, it exceeded the timeout or it throws a Sql transient error, we will be able to perform a last action to handle the imminent error.
+
+```c#
+public static IAsyncPolicy GetFallbackPolicy<T>(Func<Task<T>> action) =>
+    Policy
+        .Handle<SqlException>(ex => SqlTransientErrors.Contains(ex.Number))
+        .Or<TimeoutRejectedException>()
+        .Or<BrokenCircuitException>()
+        .FallbackAsync(cancellationToken => action(),
+            ex =>
+            {
+                var msg = $"#Polly #FallbackAsync Fallback method used due to: {ex}";
+                Log.Error(msg, ex);
+                return Task.CompletedTask;
+            })
+        .WithPolicyKey(PolicyKeys.SqlFallbackAsyncPolicy);
+```
+
+### Putting all together with Builder pattern
+
+Now that we already have defined our policies, we need a flexible and simple way to use them, that's why we're going to create a builder in order to we can make our resilient strategies easier to consume. So, the idea to make a builder is we can use either sync or async policies transparently and without care to much about implementations, and also, in order to will be able to build our resilient strategies at convenience, mixing the policies as we need them. So, let's going to take a look at the builder model, it's pretty simple but pretty useful as well.
+
+<figure>
+  <img src="{{ '/images/BuilderDiagram.png' | prepend: site.baseurl }}" alt=""> 
+  <figcaption>Fig2. - Builder model</figcaption>
+</figure>
+
+Basically, we have two policy builder implementations, one for sync and another for async ones, but the nice point, is we don't have to care about which implementation we need to reference or instantiate in order to consume it. We have a common [SqlPolicyBuilder](https://github.com/vany0114/resilience-strategy-with-polly/blob/master/src/Resilience.Polly.Sql/SqlPolicyBuilder.cs) which give us the desired builder through its `UseAsyncExecutor` or `UseSyncExecutor` methods.
+
+So, every builder ([SqlAsyncPolicyBuilder](https://github.com/vany0114/resilience-strategy-with-polly/blob/master/src/Resilience.Polly.Sql/Internals/SqlAsyncPolicyBuilder.cs) and [SqlSyncPolicyBuilder](https://github.com/vany0114/resilience-strategy-with-polly/blob/master/src/Resilience.Polly.Sql/Internals/SqlSyncPolicyBuilder.cs)) exposes methods which allow us to build a resilient strategy in a flexible way. For instance, we can build the strategy to handle the scenario defined earlier, like this:
+
+```c#
+var builder = new SqlPolicyBuilder();
+var resilientAsyncStrategy = builder
+    .UseAsyncExecutor()
+    .WithFallback(async () => result = await DoFallbackAsync())
+    .WithOverallTimeout(TimeSpan.FromMinutes(2))
+    .WithTransientErrors(retryCount: 5)
+    .WithCircuitBreaker(exceptionsAllowedBeforeBreaking: 3)
+    .Build();
+
+result = await resilientAsyncStrategy.ExecuteAsync(async () =>
+{
+    return await DoSomethingAsync();
+});
+```
+
+In the previous example, we built a strategy that exactly fits with the requirements of our scenario, it was pretty simple, right? So, we're getting an instance of `ISqlAsyncPolicyBuilder` through the `UseAsyncExecutor` method. Then, we're just playing with the policies which we already defined earlier, and finally, we're getting an instance of [IPolicyAsyncExecutor](https://github.com/vany0114/resilience-strategy-with-polly/blob/master/src/Resilience.Polly.Abstractions/PolicyAsyncExecutor.cs) which takes care of to the execution itself, it receives the policies to be wrapped and execute the delegate using the given policies.
+
+#### Policies order matters
+
+In order to build a consistent strategy, we need to pay attention to the order that we wrap the policies. As you noticed in our resilience strategy flow, the fallback policy is the outermost and the circuit breaker one, is the innermost since we need the first link in the chain will be keeping trying or fail fast, and the last link in the chain that we need, will be, degrade gracefully. Obviously, it depends on your needs, but for our case, it would make sense wrapping the circuit breaker with a timeout? that's what I mean when I say policies order matters and that's why I named the policies alphabetically using the `WithPolicyKey` method, because inside the `Build` method I sort the policies in order to guarantee a consistent strategy. Take a look at [these](https://github.com/App-vNext/Polly/wiki/PolicyWrap#ordering-the-available-policy-types-in-a-wrap) usage recommendations when it comes to wrap policies.
+
+#### Sharing policies across requests
+
+We might want to share the policy instance across requests in order to share its current state. For instance, would be very helpful when the circuit is open, in order to the incoming requests fail fast instead to waste resources trying to execute a delegate against to a resource which currently isn't available. (Actually, that's one of the requirements of our scenario) So, our `SqlPolicyBuilder` has the `UseAsyncExecutorWithSharedPolicies` and `UseSyncExecutorWithSharedPolicies` methods, which allow us to reuse policy instances that are already in use instead of create them again. This happens inside the [Build](https://github.com/vany0114/resilience-strategy-with-polly/blob/5ba73191c38bcec7861277cc42ef15fc91a1d756/src/Resilience.Polly.Sql/Internals/SqlAsyncPolicyBuilder.cs#L115) method and the policies are stored/retrieved into/from a [PolicyRegistry](https://github.com/App-vNext/Polly/wiki/PolicyRegistry). Take a look at [this](https://github.com/App-vNext/Polly/issues/494) discussion and the [official documentation](https://github.com/App-vNext/Polly/wiki/Statefulness-of-policies) to see what policies share the state across requests.
+
+### Other usage examples of strategies with our Builder
+
+You can find several integration test [there](https://github.com/vany0114/resilience-strategy-with-polly/tree/master/src/Resilience.Polly.Sql.Tests/Integration) where you can take a look at the behavior of resilient strategies given a specific scenario, but let's going to see a few common strategies here as well.
+
+#### WithDefaultPolicies
+There’s a method called `WithDefaultPolicies` which makes easier building the policies, it creates and overall timeout, wait and retry for Sql transient errors and the circuit breakers policies for those exceptions, that way you can consume your most common strategy easily.
+
+```c#
+var builder = new SqlPolicyBuilder();
+var resilientAsyncStrategy = builder
+    .UseAsyncExecutor()
+    .WithDefaultPolicies()
+    .Build();
+
+result = await resilientAsyncStrategy.ExecuteAsync(async () =>
+{
+    return await DoSomethingAsync();
+});
+
+// the analog strategy will be:
+resilientAsyncStrategy = builder
+    .UseAsyncExecutor()
+    .WithOverallTimeout(TimeSpan.FromMinutes(2))
+    .WithTransientErrors(retryCount: 5)
+    .WithCircuitBreaker(exceptionsAllowedBeforeBreaking: 3)
+    .Build();
+```
+
+#### WithTimeoutPerRetry
+Allows us to introduce a time out per retry in order to handle not only an overall timeout but the timeout of each attempt. So, in the next example it will throws a `TimeoutRejectedException` if the attempt takes more than 300 ms.
+
+```c#
+var builder = new SqlPolicyBuilder();
+var resilientAsyncStrategy = builder
+    .UseAsyncExecutor()
+    .WithDefaultPolicies()
+    .WithTimeoutPerRetry(TimeSpan.FromMilliseconds(300))
+    .Build();
+
+result = await resilientAsyncStrategy.ExecuteAsync(async () =>
+{
+    return await DoSomethingAsync();
+});
+```
+
+#### WithTransaction
+Allows us to handle Sql transient errors related with transactions when the delegate is executed under a transaction.
+
+```c#
+var builder = new SqlPolicyBuilder();
+var resilientAsyncStrategy = builder
+    .UseAsyncExecutor()
+    .WithDefaultPolicies()
+    .WithTransaction()
+    .Build();
+
+result = await resilientAsyncStrategy.ExecuteAsync(async () =>
+{
+    return await DoSomethingAsync();
+});
+```
+### To have in mind
+
+Avoid wrapping multiple operations or logic inside executors, especially when they aren't ***idempotent***, it could be a mess. Think about this scenario: 
+
+```c#
+var builder = new SqlPolicyBuilder();
+var resilientAsyncStrategy = builder
+    .UseAsyncExecutor()
+    .WithDefaultPolicies()
+    .Build();
+
+await resilientAsyncStrategy.ExecuteAsync(async () =>
+{
+  await CreateSomethingAsync();
+  await UpdateSomethingAsync();
+  await DeleteSomethingAsync();
+});
+```
+
+In the previous scenario if something went wrong, let's say into the `UpdateSomethingAsync` or `DeleteSomethingAsync` operations, next retry will try to execute again `CreateSomethingAsync` or `UpdateSomethingAsync` methods, which could be a mess, so for cases like that, we have to make sure that every operation wrapped into the executor will be ***idempotent*** or we have to make sure to wrap only one operation at a time. Also, you could handle that scenario like this:
+
+```c#
+var builder = new SqlPolicyBuilder();
+var resilientAsyncStrategy = builder
+    .UseAsyncExecutor()
+    .WithDefaultPolicies()
+    .Build();
+
+await resilientAsyncStrategy.ExecuteAsync(async () =>
+{
+  await CreateSomethingAsync();
+});
+
+await resilientAsyncStrategy.ExecuteAsync(async () =>
+{
+  await UpdateSomethingAsync();
+});
+
+await resilientAsyncStrategy.ExecuteAsync(async () =>
+{
+  await DeleteSomethingAsync();
+});
+```
+
+### Wrapping up
+
+As you can see is pretty easy and useful from the consumer point of view use the policies through a builder, because it allows us to create diverse strategies, mixing policies as we need it in a fluent manner. So, I encourage you to make your own builders in order to specialize your policies, as we said earlier, you can follow these patterns/suggestions to make your builders, let's say, for Redis, Azure Service Bus, Elasticsearch, Http, etc. The key point is to be aware that if we want to build resilient applications we can't treat every error just as an `Exception`, I mean, every resource in every scenario has its own exceptions and a proper way to handle them.
+
+> Take a look at the whole implementation on my GitHub repo: https://github.com/vany0114/resilience-strategy-with-polly
