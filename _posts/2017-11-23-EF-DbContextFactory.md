@@ -11,7 +11,7 @@ I have worked with Entity Framework in a lot of projects, it’s very useful, it
 
 > ***This is to avoid having a permanent reference to an instance of the context. Entity Framework context life cycles should be as short as possible. Using a delegate, the context is instantiated and disposed inside the class it is injected in and on every needs.***
 
-So it’s because of that and after searching an standard and good solution without finding it (e.g a package to manage it easily), I decided to create my first open source project and contribute to this great community creating the [EF.DbContextFactory](https://github.com/vany0114/EF.DbContextFactory) that I am going to explain you bellow, what’s and how it works. By the way, I’m pretty glad about it and I hope it will be useful for you all!
+So that's why after searching an standard and good solution without finding it (e.g a package to manage it easily), I decided to create my first open source project and contribute to this great community creating the [EF.DbContextFactory](https://github.com/vany0114/EF.DbContextFactory) that I am going to explain you bellow, what’s and how it works. By the way, I’m pretty glad about it and I hope it will be useful for you all!
 
 ## What EF.DbContextFactory is and How it works
 
