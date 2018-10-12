@@ -23,7 +23,7 @@ In a nutshell, Microservices architecture is an approach to build small, autonom
 ### Benefits
 
 #### Resiliency:
-When a single microservice fails for whatever reason (service is down, the node was restarted/shut down or another temporal error), it won't break the whole application, instead, another microservice could respond to that fail request and "do the work" for the instance with error. (It's like when you have a friend that helps you when you're in troubles) So, is important to implement techniques in order to enable resiliency and manage the unexpected failures, such as circuit-breaking, latency-aware, load balancing, service discovery, retries, etc. (Much of these techniques are already implemented by the orchestrators)
+When a single microservice fails for whatever reason (service is down, the node was restarted/shut down or another temporal error), it won't break the whole application, instead, another microservice could respond to that fail request and "do the work" for the instance with error. (It's like when you have a friend that helps you when you're in troubles) So, is important to implement techniques in order to enable resiliency and manage the unexpected failures, such as circuit-breaking, latency-aware, load balancing, service discovery, retries, etc. (Most of these techniques are already implemented by the orchestrators)
 
 #### Scalability:
 Each microservice can scale out independently, so, you don't need to scale the whole system (unlike the monolithic applications), instead, you can scale out only the microservices that you need when you need. In the end, it allows you to save in costs because you're going to need less hardware.
