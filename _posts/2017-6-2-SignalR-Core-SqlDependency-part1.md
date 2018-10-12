@@ -24,7 +24,7 @@ Let's talk about what things we won't have anymore in SignalR Core with respect 
 
 #### No more Jquery and 3rd party library dependencies:
 
-The web client will be pure javascript, actually it's made with [TypeScript](https://www.typescriptlang.org/) and how is well known TypeScript compiles a plane javascript, so we got the guarantee (thanks to TypeScript) that our web SignalR Core client is cross-browser, cross-host and cross-OS since the browser supports ECMAScript3. (fortunately all modern browsers support it)
+The web client will be pure javascript, actually it's made with [TypeScript](https://www.typescriptlang.org/) and as is well known TypeScript compiles a plane javascript, so we got the guarantee (thanks to TypeScript) that our web SignalR Core client is cross-browser, cross-host and cross-OS since the browser supports ECMAScript3. (fortunately all modern browsers support it)
 
 
 #### No more auto-reconnect with message replay:
