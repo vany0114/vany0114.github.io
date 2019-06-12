@@ -8,7 +8,7 @@ keywords: "chaos engineering, resilience, resiliency, resiliency testing, fault 
 published: false
 ---
 
-It's been a while since my [last post](http://elvanydev.com/resilience-with-polly/) (a lot of time I'd say) but the reason is that I’ve been working on very cool stuff ever since, one those is a new library/tool called [Simmy](https://github.com/Polly-Contrib/Simmy), which we started to develop more or less by that time (September 2018), so let me introduce that guy to you all!
+It's been a while since my [last post](http://elvanydev.com/resilience-with-polly/) (a lot of time I'd say) but the reason is that I’ve been working on very cool stuff ever since, one those is a new library/tool called [Simmy](https://github.com/Polly-Contrib/Simmy), which [we](#credits) started to develop more or less by that time (September 2018), so let me introduce that guy to you all!
 
 ## What Is Simmy?
 [Simmy](https://github.com/Polly-Contrib/Simmy) is a chaos-engineering and fault-injection tool based on the idea of the [Netflix Simian Army](https://github.com/Netflix/SimianArmy), integrating with the [Polly](https://github.com/App-vNext/Polly) resilience project for .NET, so Simmy takes advantage of the power of Polly to helps you to answer these questions:
@@ -64,16 +64,18 @@ Using Simmy, we can easily make things that usually aren't straight forward to d
 So, no more introduction, it's time to see Simmy in action!
 
 ## Hands-on Lab
-In order to stay this handy and funny as possible, we're going to base on the [DUber problem/solution](http://elvanydev.com//Microservices-part1/#the-problem) which is, as you know, a distributed architecture based on microservices using [.Net Core](https://dotnet.github.io/), [Docker](https://www.docker.com/), [Azure Service Fabric](https://azure.microsoft.com/en-us/services/service-fabric/), etc that I previously walked you through [four posts](http://elvanydev.com/Microservices-part1/).
+In order to stay this handy and funny as possible, we're going to base on the [DUber problem](http://elvanydev.com//Microservices-part1/#the-problem) and [solution](http://elvanydev.com/Microservices-part2/#production-environment-architecture) which is, as you know, a distributed architecture based on microservices using [.Net Core](https://dotnet.github.io/), [Docker](https://www.docker.com/), [Azure Service Fabric](https://azure.microsoft.com/en-us/services/service-fabric/), etc that I previously walked you through [four posts](http://elvanydev.com/Microservices-part1/).
 
 ### The example
-This example provides an example/approach of how to use Simmy in a kind of real but simple scenario over a distributed architecture to inject chaos in our system in a configurable and automatic way.
+We're going to see an example/approach of how to use Simmy in a kind of *real* but *simple* scenario over a distributed architecture to inject chaos in our system in a configurable and automatic way.
 
-The example demonstrates the following patterns with Simmy:
+So, we're going to demonstrate the following patterns with Simmy:
 
 * Configuring StartUp so that Simmy chaos policies are only introduced in builds for certain environments.
 * Configuring Simmy chaos policies to be injected into the app without changing any code, using a UI/API to update/get the chaos configuration.
-* Injecting faults or chaos automatically by using a *WatchMonkey* specifying a frequency and duration of the chaos.
+* Injecting faults or chaos automatically by using a *[WatchMonkey](#watchmonkey)* specifying a frequency and duration of the chaos.
+
+> I based myself on the great [Dylan's example](https://github.com/Polly-Contrib/Polly.Contrib.SimmyDemo_WebApi) in order to configure Simmy chaos policies on StartUp, however, there are significant differences that I’ll explain later.
 
 ### The Architecture
 
@@ -82,6 +84,90 @@ The example demonstrates the following patterns with Simmy:
   <figcaption>Fig9. - DUber Architecture using Simmy</figcaption>
 </figure>
 
+As you can see, there are a couple of new components in the architecture (respect to the [old one](http://elvanydev.com/Microservices-part2/#production-environment-architecture)), let's see:
+
+#### Chaos Settings Microservice
+It's a Web API which takes care of to store and get the [chaos settings](#the-chaos-ui) using [Azure Redis Cache](https://azure.microsoft.com/en-in/services/cache/) as a repository. This is one of the main differences I mentioned earlier; instead of using `IOptionsSnapshot<>` to get the chaos settings, we're getting the settings from the API, which is more convenient in a distributed architecture where you have deployed our services in a cluster over dozens, hundreds or even thousands of instances of your services, so in that case it's not suitable/easy just changing the `appsettings` file in every instance deployed.
+
+#### WatchMonkey
+Is an [Azure Function](https://docs.microsoft.com/en-us/azure/azure-functions/functions-overview) with a [timer trigger](https://docs.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer) which is executed every 5 minutes (value set arbitrarily for this example) in order to watch the monkeys (chaos settings/policies) set up trhough the [chaos UI](#the-chaos-ui). So, if the automatic chaos injection is enabled it releases all the monkeys for the given frequency within the time window configured (Max Duration), after that time window all the monkeys are caged (disabled) again. It also watches monkeys with a specific duration, allowing you to disable specific faults in a smaller window time.
+
+You can find the whole explanation about that architecture [here](http://elvanydev.com/Microservices-part2/).
+
+### The Chaos UI
+Is the monkeys administrator, which allows us to set up the [general chaos settings](#general-chaos-settings) and also [settings at operation level](#operations-chaos-settings). The UI uses the [Chaos Settings API](#chaos-settings-microservice) to store and get the settings.
+
+#### General Chaos Settings
+
+<figure>
+  <img src="{{ '/images/Simmy-Example-general-chaos-settings.png' | prepend: site.baseurl }}" alt=""> 
+  <figcaption>Fig9. - General chaos settings window</figcaption>
+</figure>
+
+***Enable Automatic Chaos Injection:***
+Allows you to inject the chaos automatically based on a frequency and maximum chaos time duration.
+
+***Frequency:***
+A `Timespan` indicating how often the chaos should be injected.
+
+***Max Duration:***
+A `Timespan` indicating how long the chaos should take once is injected.
+
+***Enable Cluster Chaos:***
+Allows you to inject chaos at cluster level. (This example uses Azure Service Fabric as orchestrator)
+
+***Percentage Nodes to Restart:***
+An `int` between 0 and 100, indicating the percentage of nodes that should be restarted if cluster chaos is enabled.
+
+***Percentage Nodes To Stop:***
+An `int` between 0 and 100, indicating the percentage of nodes that should be stopped if cluster chaos is enabled.
+
+***Resource Group Name:***
+The name of the resource group where the VM Scale Set of the cluster belongs to.
+
+***VM Scale Set Name:***
+The name of the Virtual Machine Scale Set used by the cluster.
+
+***Injection Rsate:***
+A `double` between 0 and 1, indicating what proportion of calls should be subject to failure-injection. For example, if 0.2, twenty percent of calls will be randomly affected; if 0.01, one percent of calls; if 1, all calls.
+
+#### Operations Chaos Settings
+
+<figure>
+  <img src="{{ '/images/Simmy-Example-Architecture-operation-chaos-settings-exception.png' | prepend: site.baseurl }}" alt=""> 
+  <figcaption>Fig9. - Operations chaos settings window</figcaption>
+</figure>
+
+***Operation:***
+Which operation within the app these chaos settings apply to. Each call site in your codebase which uses Polly and Simmy can be tagged with an [OperationKey](#using-chaos-settings-factory-from-a-controllerservicerepositorywherever). This is simply a string tag you choose, to identify different call paths in your app, in our case, we're using an [enumeration](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Domain/Duber.Domain.SharedKernel/Chaos/OperationKeys.cs) located in the *Shared Kernel* project, where we've defined (arbitrarily) some operations to inject them some chaos.
+
+***Duration:***
+A `Timespan` indicating how long the chaos for a specific operation should take once is injected if Automatic Chaos Injection is enabled. (Optional)
+
+***Injection Rsate:***
+A `double` between 0 and 1, indicating what proportion of calls should be subject to failure-injection. For example, if 0.2, twenty percent of calls will be randomly affected; if 0.01, one percent of calls; if 1, all calls.
+
+***Latency:***
+If set, this much extra latency in ms will be added to affected calls, before the http request is made.
+
+***Exception:***
+If set, affected calls will throw the given exception. (The original outbound http/sql/whatever call will not be placed.)
+
+***Status Code:***
+If set, a result with the given http status code will be returned for affected calls. (The original outbound http call will not be placed.)
+
+***Enabled:***
+A master switch for this call site. When true, faults may be injected at this call site per the other parameters; when false, no faults will be injected.
+
+### How the chaos is injected?
+>Calls guarded by Polly policies often wrap a series of policies around a call using `PolicyWrap`. The policies in the `PolicyWrap` act as nesting middleware around the outbound call.
+The recommended technique for introducing `Simmy` is to use one or more Simmy chaos policies as the innermost policies in a `PolicyWrap`.
+By placing the chaos policies innermost, they subvert the usual outbound call at the last minute, substituting their fault or adding extra latency.
+The existing Polly policies - further out in the `PolicyWrap` - still apply, so you can test how the Polly resilience you have configured handles the chaos/faults injected by `Simmy`.
+
+### Putting all together
+
+So, once you have configured your monkeys (chaos policies), 
 
 ## Credits!
 > Simmy was the [brainchild](https://github.com/App-vNext/Polly/issues/499) of [@mebjas](https://github.com/mebjas) and [@reisenberger](https://github.com/reisenberger). The major part of the implementation was by [@mebjas](https://github.com/mebjas) and [myself](https://github.com/vany0114), with contributions also from [@reisenberger](https://github.com/reisenberger) of the Polly team.
