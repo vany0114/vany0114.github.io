@@ -61,7 +61,7 @@ Using Simmy, we can easily make things that usually aren't straight forward to d
 * A way to revert easily, to control the blast radius.
 * Production grade, to run this in a production or near-production system with automation.
 
-So, no more introduction, it's time to see Simmy in action!
+No more introduction, let's see Simmy in action!
 
 ## Hands-on Lab
 In order to stay this handy and funny as possible, let's base on the DUber [problem](http://elvanydev.com//Microservices-part1/#the-problem) and [solution](http://elvanydev.com/Microservices-part2/#production-environment-architecture) which is, as you know, a distributed architecture based on microservices using [.Net Core](https://dotnet.github.io/), [Docker](https://www.docker.com/), [Azure Service Fabric](https://azure.microsoft.com/en-us/services/service-fabric/), etc that I previously walked you through [four posts](http://elvanydev.com/Microservices-part1/).
@@ -114,7 +114,7 @@ A `Timespan` indicating how often the chaos should be injected.
 A `Timespan` indicating how long the chaos should take once is injected.
 
 ***Enable Cluster Chaos:***
-Allows you to inject chaos at cluster level. (This example uses Azure Service Fabric as orchestrator)
+Allows you to inject chaos at cluster level. (You will need to create a [service principal](https://blog.jongallant.com/2017/11/azure-rest-apis-postman/), then set up the values for `GeneralChaosSetting` section into the `appsettings` file of `Duber.Chaos.API` project, or their respective environment variables inside `docker-compose.override`. You might consider storing these secrets into an [Azure Key Vault](https://docs.microsoft.com/en-us/azure/key-vault/key-vault-whatis))
 
 ***Percentage Nodes to Restart:***
 An `int` between 0 and 100, indicating the percentage of nodes that should be restarted if cluster chaos is enabled.
@@ -134,12 +134,12 @@ A `double` between 0 and 1, indicating what proportion of calls should be subjec
 #### Operations Chaos Settings
 
 <figure>
-  <img src="{{ '/images/Simmy-Example-Architecture-operation-chaos-settings-exception.png' | prepend: site.baseurl }}" alt=""> 
+  <img src="{{ '/images/Simmy-Example-operation-chaos-settings-exception.png' | prepend: site.baseurl }}" alt=""> 
   <figcaption>Fig9. - Operations chaos settings window</figcaption>
 </figure>
 
 ***Operation:***
-Which operation within the app these chaos settings apply to. Each call site in your codebase which uses Polly and Simmy can be tagged with an [OperationKey](#using-chaos-settings-factory-from-a-controllerservicerepositorywherever). This is simply a string tag you choose, to identify different call paths in your app, in our case, we're using an [enumeration](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Domain/Duber.Domain.SharedKernel/Chaos/OperationKeys.cs) located in the *Shared Kernel* project, where we've defined (arbitrarily) some operations to inject them some chaos.
+Which operation within the app these chaos settings apply to. Each call site in your codebase which uses Polly and Simmy can be tagged with an [OperationKey](#using-chaos-settings-factory-from-consumers). This is simply a string tag you choose, to identify different call paths in your app, in our case, we're using an [enumeration](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Domain/Duber.Domain.SharedKernel/Chaos/OperationKeys.cs) located in the *Shared Kernel* project, where we've defined (arbitrarily) some operations to inject them some chaos.
 
 ***Duration:***
 A `Timespan` indicating how long the chaos for a specific operation should take once is injected if Automatic Chaos Injection is enabled. (Optional) Should be less than the value configured for *MaxDuration*.
@@ -161,10 +161,12 @@ A master switch for this call site. When true, faults may be injected at this ca
 
 ### How the chaos is injected?
 
-The best way to build [robust resilience strategies](http://elvanydev.com/resilience-with-polly/) using Polly is through the [PolicyWrap](http://elvanydev.com/resilience-with-polly/#the-power-of-policywrap), which at the end of the day makes up a set of policies working together as a single policy. So, the recommended way for introducing `Simmy` is to use one or more *Monkey Policies* as the innermost policies in the `PolicyWrap`. That way, they alter the usual outbound call at the last minute, substituting their fault or adding extra latency allowing us to test our resilience strategies and see how we're handling the chaos/faults injected by `Simmy`.
+The best way to build [robust resilience strategies](http://elvanydev.com/resilience-with-polly/) using Polly is through the [PolicyWrap](http://elvanydev.com/resilience-with-polly/#the-power-of-policywrap), which at the end of the day makes up a set of policies working together as a single policy. So, the recommended way for introducing `Simmy` is to use one or more *Monkey Policies* as the innermost policies in the `PolicyWrap`. That way, they alter the usual outbound call at the last minute, substituting their fault, adding a custom behavior or adding extra latency allowing us to test our resilience strategies and see how we're handling the chaos/faults injected by `Simmy`.
 
 One of the simplest ways to add chaos-injection all across your app without changing existing configuration code is taking advantage of `PolicyRegistry` by storing all policies of each strategy in their respect registry (you might have several strategies with different policies to handle different scenarios, thus different `PolicyRegistry's`). 
 So, in order to do that, we're going to add some code in `StartUp` class.
+
+First of all, we need to add our resilience strategies, then we're going to inject them chaos policies (monkeys). For `Http` calls, we're going to build a strategy on the fly, but for `SQL Azure` database calls we're going to use our `SqlPolicyBuilder` which we've made [previously](http://elvanydev.com/resilience-with-polly/#putting-all-together-with-builder-pattern) because the idea is to reuse our resilience strategies!
 
 #### Setting up our Http resilience strategy
 ```c#
@@ -186,8 +188,8 @@ services.AddSingleton<IPolicyAsyncExecutor>(sp =>
         .Build();
 });
 ```
-
-First of all, we need to add our resilience strategies, then we're going to inject them chaos policies (monkeys). As you can see, we're using the `SqlPolicyBuilder` we made [previously](http://elvanydev.com/resilience-with-polly/#putting-all-together-with-builder-pattern) because the idea is to reuse our resilience strategies!
+#### Injecting chaos policies (monkeys) to our resilient strategies
+We're injecting the monkeys only in environments different than `Development` (which is the usual, but it's up to you, even you might make it configurable through the Chaos UI as well) through the `AddChaosInjectors/AddHttpChaosInjectors` extension methods on `IPolicyRegistry<>` which simply takes every policy in our `PolicyRegistry` and wraps `Simmy` policies (as the innermost policy) inside.
 
 ```c#
 if (env.IsDevelopment() == false)
@@ -202,11 +204,100 @@ if (env.IsDevelopment() == false)
 }
 ```
 
-The `AddChaosInjectors/AddHttpChaosInjectors` extension methods on `IPolicyRegistry<>` simply takes every policy in your `PolicyRegistry` and wraps `Simmy` policies (as the innermost policy) inside. This allows us to inject `Simmy` into our app without changing any of our existing app configuration of `Polly` policies. This extension method configures the policies in the `PolicyRegistry` with `Simmy` policies which react to chaos configured trhough the UI.
+```c#
+public static IPolicyRegistry<string> AddHttpChaosInjectors(this IPolicyRegistry<string> registry)
+{
+    foreach (var policyEntry in registry)
+    {
+        if (policyEntry.Value is IAsyncPolicy<HttpResponseMessage> policy)
+        {
+            registry[policyEntry.Key] = policy
+                    .WrapAsync(MonkeyPolicy.InjectFaultAsync<HttpResponseMessage>(
+                        (ctx, ct) => GetException(ctx, ct),
+                        GetInjectionRate,
+                        GetEnabled))
+                    .WrapAsync(MonkeyPolicy.InjectFaultAsync<HttpResponseMessage>(
+                        (ctx, ct) => GetHttpResponseMessage(ctx, ct),
+                        GetInjectionRate,
+                        GetHttpResponseEnabled))
+                    .WrapAsync(MonkeyPolicy.InjectLatencyAsync<HttpResponseMessage>(
+                        GetLatency,
+                        GetInjectionRate,
+                        GetEnabled))
+                    .WrapAsync(MonkeyPolicy.InjectBehaviourAsync<HttpResponseMessage>(
+                        (ctx, ct) => RestartNodes(ctx, ct),
+                        GetClusterChaosInjectionRate,
+                        GetClusterChaosEnabled))
+                    .WrapAsync(MonkeyPolicy.InjectBehaviourAsync<HttpResponseMessage>(
+                        (ctx, ct) => StopNodes(ctx, ct),
+                        GetClusterChaosInjectionRate,
+                        GetClusterChaosEnabled));
+        }
+    }
 
-### Putting all together
+    return registry;
+}
+``` 
+This allows us to inject `Simmy` into our app without changing any of our existing app configuration of `Polly` policies. These extension methods configure the policies in the `PolicyRegistry` with `Simmy` policies which react to chaos configured through the UI getting that configuration from Polly `Context` at runtime taking advantage of the power of the contextual configuration.
 
-So, once you have configured your monkeys (chaos policies), 
+> Notice that we're using the *InjectFaultAsync* monkey policy not only to inject an *Exception* but to inject a *HttpResponseMessage*. Also, we're using the *InjectBehaviourAsync* monkey to inject the [custom behavior](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Infrastructure/Duber.Infrastructure.Chaos/CustomChaos/ClusterChaosManager.cs) which takes care of to restart/stop instances in our cluster.
+
+### How does it get the chaos settings?
+We're injecting a factory which takes care of getting the current chaos settings from the Chaos API. So we're injecting the factory as a `Lazy Task Scoped` service because we want to avoid to add additional overhead/latency to our system, that way we only retrieve the configuration once per request no matter how many times the factory is executed.
+
+#### Injecting chaos settings factory
+```c#
+public static IServiceCollection AddChaosApiHttpClient(this IServiceCollection services, IConfiguration configuration)
+{
+    services.AddHttpClient<ChaosApiHttpClient>(client =>
+    {
+        client.Timeout = TimeSpan.FromSeconds(5);
+        client.BaseAddress = new Uri(configuration.GetValue<string>("ChaosApiSettings:BaseUrl"));
+    });
+
+    services.AddScoped<Lazy<Task<GeneralChaosSetting>>>(sp =>
+    {
+        // we use LazyThreadSafetyMode.None in order to avoid locking.
+        var chaosApiHttpClient = sp.GetRequiredService<ChaosApiHttpClient>();
+        return new Lazy<Task<GeneralChaosSetting>>(() => chaosApiHttpClient.GetGeneralChaosSettings(), LazyThreadSafetyMode.None);
+    });
+
+    return services;
+}
+```
+
+#### Using chaos settings factory from consumers
+So, wherever we want to make the chaos is injected inside of the workflow of our application using `Polly` and `Simmy` (and also using this approach), the only thing we need to do (after set up the resilience strategies and monkeys of course) is tagging the executions through the `OperationKey` as we explained before and storing the chaos settings inside the `Context` using the `WithChaosSettings` extension method, that way, the chaos might or might not be injected at runtime contextually. 
+
+```c#
+// constructor
+public TripController(Lazy<Task<GeneralChaosSetting>> generalChaosSettingFactory,...)
+{
+    ...
+}
+
+public async Task<IActionResult> SimulateTrip(TripRequestModel model)
+{
+    ...
+    generalChaosSetting = await _generalChaosSettingFactory.Value;
+    var context = new Context(OperationKeys.TripApiCreate.ToString()).WithChaosSettings(generalChaosSetting);
+    var response = await _httpClient.SendAsync(request, context);
+    ...
+}
+
+private async Task UpdateTripLocation(Guid tripId, LocationModel location)
+{
+    ...
+    generalChaosSetting = await _generalChaosSettingFactory.Value;
+    var context = new Context(OperationKeys.TripApiUpdateCurrentLocation.ToString()).WithChaosSettings(generalChaosSetting);
+    var response = await _httpClient.SendAsync(request, context);
+    ...
+}
+
+```
+In this example, we're injecting the monkey policies at different layers such as Application and Data, in the case of the Application layer, we're tagging all the operations related with the simulation of a trip into the website's [Trip controller](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Web/Duber.WebSite/Controllers/ChaosController.cs). In the case of the Data layer, we're injecting the chaos at general level by tagging all the operations of the [InvoiceContext](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Domain/Invoice/Duber.Domain.Invoice/Persistence/InvoiceContext.cs) with the same tag. That allows us to test the resilience of our system at different layers but also as granular or as general as we want. So, we can see how the system behaves if there's an error in the database and how the downstream calls like the repository, controller, etc are degraded.
+
+At the end of the day is up to you where you want to be possible the chaos is injected to, it depends on whatever makes more sense to you given your resilience strategies, for example, in our case, given that we have a strategy for SQL executions, might be interesting inject some chaos on the [ReportingRepository](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Web/Duber.WebSite/Infrastructure/Repository/ReportingRepository.cs) as well to see how's the behavior when it's updating the materialized view, because if we're not handling the errors properly there, we might lose the messages from the message bus, and that's not good.
 
 ## Credits!
 > Simmy was the [brainchild](https://github.com/App-vNext/Polly/issues/499) of [@mebjas](https://github.com/mebjas) and [@reisenberger](https://github.com/reisenberger). The major part of the implementation was by [@mebjas](https://github.com/mebjas) and [myself](https://github.com/vany0114), with contributions also from [@reisenberger](https://github.com/reisenberger) of the Polly team.
