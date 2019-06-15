@@ -5,7 +5,6 @@ comments: true
 image: Simmy_jumbo.png
 excerpt: Simmy is a chaos-engineering and fault-injection tool based on the idea of the Netflix Simian Army, integrating with the Polly resilience project for .NET. Simmy allows you to introduce a chaos-injection policy or policies at any location where you execute code through Polly.
 keywords: "chaos engineering, resilience, resiliency, resiliency testing, fault injection, polly resilience, fault tolerance, fault based testing, fault tolerant, distributed systems, microservices, simmy, polly simmy, monkey, monkeys, chaos, simian army, inject latency, inject behavior, inject result, inject exception, chaos policies, monkey policies, transient-fault-handling, error-handling, transient fault handling, error handling, retry, circuit-breaker, circuit breaker, timeout, bulkhead isolation, fallback, PolicyWrap, netflix, simian, simian army, netflix simian army, .net, .net core, dotnet, dotnet core"
-published: false
 ---
 
 It's been a while since my [last post](http://elvanydev.com/resilience-with-polly/) (a lot of time I'd say) but the reason is that I’ve been working on very cool stuff ever since, one those is a new library/tool called [Simmy](https://github.com/Polly-Contrib/Simmy), which [we](#credits) started to develop more or less by that time (September 2018), so let me introduce that guy to you all!
@@ -238,12 +237,12 @@ public static IPolicyRegistry<string> AddHttpChaosInjectors(this IPolicyRegistry
     return registry;
 }
 ``` 
-This allows us to inject `Simmy` into our app without changing any of our existing app configuration of `Polly` policies. These extension methods configure the policies in the `PolicyRegistry` with `Simmy` policies which react to chaos configured through the UI getting that configuration from Polly `Context` at runtime taking advantage of the power of the contextual configuration.
+This allows us to inject `Simmy` into our app without changing any of our existing app configuration of `Polly` policies. These extension methods configure the policies in the `PolicyRegistry` with `Simmy` policies which react to chaos configured through the UI getting that configuration from Polly `Context` at runtime taking advantage of the power of the [contextual configuration](https://github.com/Polly-Contrib/Simmy#context-driven-behaviour).
 
 > Notice that we're using the *InjectFaultAsync* monkey policy not only to inject an *Exception* but to inject a *HttpResponseMessage*. Also, we're using the *InjectBehaviourAsync* monkey to inject the [custom behavior](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Infrastructure/Duber.Infrastructure.Chaos/CustomChaos/ClusterChaosManager.cs) which takes care of to restart/stop instances in our cluster.
 
 ### How does it get the chaos settings?
-We're injecting a factory which takes care of getting the current chaos settings from the Chaos API. So we're injecting the factory as a `Lazy Task Scoped` service because we want to avoid to add additional overhead/latency to our system, that way we only retrieve the configuration once per request no matter how many times the factory is executed.
+We're injecting a factory which takes care of getting the current chaos settings from the [Chaos API](#chaos-settings-microservice). So we're injecting the factory as a `Lazy Task Scoped` service because we want to avoid to add additional overhead/latency to our system, that way we only retrieve the configuration once per request no matter how many times the factory is executed.
 
 #### Injecting chaos settings factory
 ```c#
@@ -267,7 +266,7 @@ public static IServiceCollection AddChaosApiHttpClient(this IServiceCollection s
 ```
 
 #### Using chaos settings factory from consumers
-So, wherever we want to make the chaos is injected inside of the workflow of our application using `Polly` and `Simmy` (and also using this approach), the only thing we need to do (after set up the resilience strategies and monkeys of course) is tagging the executions through the `OperationKey` as we explained before and storing the chaos settings inside the `Context` using the `WithChaosSettings` extension method, that way, the chaos might or might not be injected at runtime contextually. 
+So, wherever we want to make the chaos is injected inside of the workflow of our application using `Polly` and `Simmy` (and also using this approach), the only thing we need to do (after to set up the resilience strategies and monkeys, of course) is tagging the executions through the `OperationKey` as we explained before and storing the chaos settings inside the `Context` using the `WithChaosSettings` extension method, that way, the chaos might or might not be injected at runtime contextually. 
 
 ```c#
 // constructor
@@ -295,9 +294,41 @@ private async Task UpdateTripLocation(Guid tripId, LocationModel location)
 }
 
 ```
-In this example, we're injecting the monkey policies at different layers such as Application and Data, in the case of the Application layer, we're tagging all the operations related with the simulation of a trip into the website's [Trip controller](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Web/Duber.WebSite/Controllers/ChaosController.cs). In the case of the Data layer, we're injecting the chaos at general level by tagging all the operations of the [InvoiceContext](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Domain/Invoice/Duber.Domain.Invoice/Persistence/InvoiceContext.cs) with the same tag. That allows us to test the resilience of our system at different layers but also as granular or as general as we want. So, we can see how the system behaves if there's an error in the database and how the downstream calls like the repository, controller, etc are degraded.
 
-At the end of the day is up to you where you want to be possible the chaos is injected to, it depends on whatever makes more sense to you given your resilience strategies, for example, in our case, given that we have a strategy for SQL executions, might be interesting inject some chaos on the [ReportingRepository](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Web/Duber.WebSite/Infrastructure/Repository/ReportingRepository.cs) as well to see how's the behavior when it's updating the materialized view, because if we're not handling the errors properly there, we might lose the messages from the message bus, and that's not good.
+### Putting all together
+
+In this example, we're injecting the monkey policies at different layers such as Application, Data and the Anti Corruption Layer. (which at the end of the day, it is executed in the Application layer) In the case of the Application layer, we're tagging all the operations related with the simulation of a trip into the website's [Trip controller](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Web/Duber.WebSite/Controllers/ChaosController.cs). 
+
+By the other hand, we're tagging the call to the *Payment* service which is an external system, that's why that [guy](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Domain/Duber.Domain.ACL/Adapters/PaymentServiceAdapter.cs) lives in our ACL (Anti Corruption Layer). So, be able to inject chaos here is pretty interesting, because it's an external dependency which we don't have control, so we might want to simulate how our system behaves when that service returns a `BadRequest`, `InternalServelError`, etc.
+
+In the case of the Data layer, we're injecting the chaos at general level by tagging all the operations of the [InvoiceContext](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Domain/Invoice/Duber.Domain.Invoice/Persistence/InvoiceContext.cs) with the same tag. That allows us to test the resilience of our system at different layers but also as granular or as general as we want. So, we can see how the system behaves if there's an error in the database and how the downstream calls like the repository, controller, etc are degraded.
+
+At the end of the day is up to you where you want to be possible the chaos is injected to, it depends on whatever makes more sense to you given your resilience strategies, for example, in our case, given that we have a strategy for SQL executions, might be interesting inject some chaos on the [ReportingRepository](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Web/Duber.WebSite/Infrastructure/Repository/ReportingRepository.cs) as well, to see how's the behavior when there's an error when it's updating the materialized view, because if we're not handling the errors properly there, we might lose the messages from the message bus, and that's not good.
+
+### Considerations
+
+* You might want to consider making the [Chaos UI](#the-chaos-ui) in a separated project, in our case it's housed into `Duber.WebSite` just for the example purposes, but that's usually an internal tool mostly for the SRE team.
+* You might want to deploy the [Chaos Settings API](#chaos-settings-microservice) outside of the cluster in order to avoid it will be affected when you released the cluster chaos.
+* You'll need to secure properly the *Chaos Settings API*.
+* The cluster chaos does not depend on a specific operation, so when it's enabled the monkey will be released by the first policy executed configured previously in our workflow, it means that in our case might be, simulating a trip, creating an invoice or performing the payment. (you could inject it at operation level as well if you want to)
+* The cluster chaos also may introduce extra latency since we're using [Azure REST API](https://docs.microsoft.com/en-us/rest/api/azure/) to [restart/stop](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Infrastructure/Duber.Infrastructure.Chaos/CustomChaos/ClusterChaosManager.cs) nodes in our cluster. So we need a request to get the token (that's why we need a [Service Principal](https://blog.jongallant.com/2017/11/azure-rest-apis-postman/)) and a couple of requests more to get the VM's then restart/stop them.
+* We choose [Azure Cache for Redis](https://azure.microsoft.com/en-in/services/cache/) to store the chaos settings because of the high performance we need here since we need to get the settings in every request and we don't want to add extra overhead and latency to our system. (We might consider using [data persistence](https://docs.microsoft.com/en-us/azure/azure-cache-for-redis/cache-how-to-premium-persistence))
+
+## Wrapping up
+
+We’ve seen how important is nowadays the chaos engineering and the power of [Polly](https://github.com/App-vNext/Polly) and [Simmy](https://github.com/Polly-Contrib/Simmy) working together to meet [its principles](http://principlesofchaos.org/), and how they can help us to make sure that our resilience strategies are working fine and actually we’re truly offering a highly available and reliable service injecting the chaos to our system without changing existing configuration code and in an automatic way to enable making chaos periodically, allowing us to test our system in production environment under chaotic conditions, using chaos policies such as [Fault](https://github.com/Polly-Contrib/Simmy#inject-fault), [Latency](https://github.com/Polly-Contrib/Simmy#inject-latency) and [Behavior](https://github.com/Polly-Contrib/Simmy#inject-behavior).
+
+The approach we've proposed here has pros and cons (like everything), for instance, one of the biggest advantages of having a [Chaos API](#chaos-settings-microservice) is that it allows us to automate the chaos injection not only through the [WatchMonkey](#watchmonkey) but after a deployment, we might use an [Azure DevOps Gate](https://docs.microsoft.com/en-us/azure/devops/pipelines/release/approvals/gates?view=azure-devops) to enable the automatic chaos, then let the *WatchMonkey* does the dirty work, which is very convenient in order to make sure that our latest releases keep withstanding turbulence conditions in a production environment. Besides the automation, we could take the API to the next level, for example, we can record logs, or whatever metadata to analyze them and make further decisions.
+
+By the other hand, one of the disadvantages could be the latency that the Chaos API may introduce to our system since we're going to need an additional request where we're using our *Chaos Policies*, that's why we need to ensure that the API is going to be highly available and fast as possible.
+
+## Next steps
+
+We need to have in mind that a good chaos engineering tool/strategy also requires a good monitoring tool/strategy in order to be able to realize easily about system weaknesses and be aware where they are exactly, then be able to make decisions faster to fix them, otherwise might be painful and harder try to improve our system however much we have developed a great chaos engineering strategy. So, I'd recommend [Application Insights](https://docs.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview), [Azure Monitor](https://docs.microsoft.com/en-us/azure/azure-monitor/overview), [Stackify Retrace](https://stackify.com/retrace/), etc.
+
+So, stay tuned because in the next post we'll purpose another approach using [Azure App Configuration](https://docs.microsoft.com/en-us/azure/azure-app-configuration/overview) and how it can help us to solve the downside we mentioned before of this current approach about the latency. In the meantime, I encourage you all to start making experiments using [Simmy](https://github.com/Polly-Contrib/Simmy) in order to you can realize by yourself about the power of this little monkey!
 
 ## Credits!
-> Simmy was the [brainchild](https://github.com/App-vNext/Polly/issues/499) of [@mebjas](https://github.com/mebjas) and [@reisenberger](https://github.com/reisenberger). The major part of the implementation was by [@mebjas](https://github.com/mebjas) and [myself](https://github.com/vany0114), with contributions also from [@reisenberger](https://github.com/reisenberger) of the Polly team.
+> Simmy was the [brainchild](https://github.com/App-vNext/Polly/issues/499) of [@mebjas](https://github.com/mebjas) and [@reisenberger](https://github.com/reisenberger). The major part of the implementation was by [@mebjas](https://github.com/mebjas) and [myself](https://github.com/vany0114), with contributions also from [@reisenberger](https://github.com/reisenberger) of the Polly team. Thanks also to [@joelhulen](https://github.com/joelhulen) for the amazing work with the logos and the help on admin/DevOps tasks.
+
+> Take a look at the whole implementation on my GitHub repo: https://github.com/vany0114/chaos-injection-using-simmy
