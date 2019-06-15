@@ -10,7 +10,7 @@ keywords: "chaos engineering, resilience, resiliency, resiliency testing, fault 
 It's been a while since my [last post](http://elvanydev.com/resilience-with-polly/) (a lot of time I'd say) but the reason is that I’ve been working on very cool stuff ever since, one those is a new library/tool called [Simmy](https://github.com/Polly-Contrib/Simmy), which [we](#credits) started to develop more or less by that time (September 2018), so let me introduce that guy to you all!
 
 ## What Is Simmy?
-[Simmy](https://github.com/Polly-Contrib/Simmy) is a chaos-engineering and fault-injection tool based on the idea of the [Netflix Simian Army](https://github.com/Netflix/SimianArmy), integrating with the [Polly](https://github.com/App-vNext/Polly) resilience project for .NET, so Simmy takes advantage of the power of Polly to helps you to answer these questions:
+[Simmy](https://github.com/Polly-Contrib/Simmy) is a chaos-engineering and fault-injection tool based on the idea of the [Netflix Simian Army](https://github.com/Netflix/SimianArmy), integrating with the [Polly](https://github.com/App-vNext/Polly) resilience project for .NET, so Simmy takes advantage of the power of Polly to help you to answer these questions:
 
 * Is my system resilient enough?
 * Am I handling the right exceptions/scenarios?
@@ -29,7 +29,7 @@ So, Simmy is a pirate monkey, like [Jack the monkey](https://disney.fandom.com/w
 ## What is Chaos Engineering?
 > [Chaos Engineering](http://principlesofchaos.org/) is the discipline of experimenting on a distributed system in order to build confidence in the system’s capability to withstand turbulent conditions in production. 
 
-Given that distributed architectures nowadays leverage the most critical systems and most popular applications which we use every day, the chaos engineering and [its principles](http://principlesofchaos.org/) have become in an important matter, so much so that it's considered as a discipline and I'd say that for almost every SRE team, being aware of those principles is a must when it comes to truly guarantee the resilience and reliability of the systems.
+Given that distributed architectures nowadays leverage the most critical systems and most popular applications which we use every day, the chaos engineering and [its principles](http://principlesofchaos.org/) have become in an important matter, so much so that it's considered as a discipline and I'd say that for almost every SRE team out there, being aware of those principles is a must when it comes to truly guarantee the resilience and reliability of the systems.
 
 As I mentioned earlier, Netflix is one of the most important contributors in the matter with its [Simian Army project](https://netflix.github.io/chaosmonkey/) which in a nutshell, is a framework to inject faults randomly in a production environment, such as stop instances, introduce latency or even simulates an outage of an entire availability zone allowing you to detect abnormal conditions and test the ability to survive them.
 
@@ -308,7 +308,7 @@ At the end of the day is up to you where you want to be possible the chaos is in
 ### Considerations
 
 * You might want to consider making the [Chaos UI](#the-chaos-ui) in a separated project, in our case it's housed into `Duber.WebSite` just for the example purposes, but that's usually an internal tool mostly for the SRE team.
-* You might want to deploy the [Chaos Settings API](#chaos-settings-microservice) outside of the cluster in order to avoid it will be affected when you released the cluster chaos.
+* You might want to deploy the [Chaos Settings API](#chaos-settings-microservice) outside of the cluster in order to avoid it will be affected when you release the cluster chaos.
 * You'll need to secure properly the *Chaos Settings API*.
 * The cluster chaos does not depend on a specific operation, so when it's enabled the monkey will be released by the first policy executed configured previously in our workflow, it means that in our case might be, simulating a trip, creating an invoice or performing the payment. (you could inject it at operation level as well if you want to)
 * The cluster chaos also may introduce extra latency since we're using [Azure REST API](https://docs.microsoft.com/en-us/rest/api/azure/) to [restart/stop](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Infrastructure/Duber.Infrastructure.Chaos/CustomChaos/ClusterChaosManager.cs) nodes in our cluster. So we need a request to get the token (that's why we need a [Service Principal](https://blog.jongallant.com/2017/11/azure-rest-apis-postman/)) and a couple of requests more to get the VM's then restart/stop them.
