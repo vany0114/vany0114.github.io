@@ -104,7 +104,7 @@ Is the monkeys administrator, which allows us to set up the [general chaos setti
 </figure>
 
 ***Enable Automatic Chaos Injection:***
-Allows you to inject the chaos automatically based on a frequency and maximum chaos time duration.
+Allows you to inject the chaos automatically based on a frequency and maximum chaos time duration. Which means in the given example, that the chaos will be enabled every day (every 23:59 hours) and it will take 15 minutes.
 
 ***Frequency:***
 A `Timespan` indicating how often the chaos should be injected.
