@@ -297,7 +297,7 @@ private async Task UpdateTripLocation(Guid tripId, LocationModel location)
 
 ### Putting all together
 
-In this example, we're injecting the monkey policies at different layers such as Application, Data and the Anti Corruption Layer. (which at the end of the day, it is executed in the Application layer) In the case of the Application layer, we're tagging all the operations related with the simulation of a trip into the website's [Trip controller](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Web/Duber.WebSite/Controllers/ChaosController.cs). 
+In this example, we're injecting the monkey policies at different layers such as Application, Data and the Anti Corruption Layer. (which at the end of the day, it is executed in the Application layer) In the case of the Application layer, we're tagging all the operations related with the simulation of a trip into the website's [Trip controller](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Web/Duber.WebSite/Controllers/TripController.cs). 
 
 On the other hand, we're tagging the call to the *Payment* service which is an external system, that's why that [guy](https://github.com/vany0114/chaos-injection-using-simmy/blob/master/src/Domain/Duber.Domain.ACL/Adapters/PaymentServiceAdapter.cs) lives in our ACL (Anti Corruption Layer). So, being able to inject chaos here is pretty interesting, because it's an external dependency which we don't have control on, so we might want to simulate how our system behaves when that service returns a `BadRequest`, `InternalServelError`, etc.
 
