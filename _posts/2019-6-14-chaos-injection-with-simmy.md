@@ -80,7 +80,7 @@ So, we're going to demonstrate the following patterns with Simmy:
 
 <figure>
   <img src="{{ '/images/Simmy-Example-Architecture.png' | prepend: site.baseurl }}" alt=""> 
-  <figcaption>Fig9. - DUber Architecture using Simmy</figcaption>
+  <figcaption>Fig1. - DUber Architecture using Simmy</figcaption>
 </figure>
 
 As you can see, there are a couple of new components in the architecture (respect to the [old one](http://elvanydev.com/Microservices-part2/#production-environment-architecture)), let's see:
@@ -100,7 +100,7 @@ Is the monkeys administrator, which allows us to set up the [general chaos setti
 
 <figure>
   <img src="{{ '/images/Simmy-Example-general-chaos-settings.png' | prepend: site.baseurl }}" alt=""> 
-  <figcaption>Fig9. - General chaos settings window</figcaption>
+  <figcaption>Fig2. - General chaos settings window</figcaption>
 </figure>
 
 ***Enable Automatic Chaos Injection:***
@@ -134,7 +134,7 @@ A `double` between 0 and 1, indicating what proportion of calls should be subjec
 
 <figure>
   <img src="{{ '/images/Simmy-Example-operation-chaos-settings-exception.png' | prepend: site.baseurl }}" alt=""> 
-  <figcaption>Fig9. - Operations chaos settings window</figcaption>
+  <figcaption>Fig3. - Operations chaos settings window</figcaption>
 </figure>
 
 ***Operation:***
@@ -326,7 +326,7 @@ On the other hand, one of the disadvantages could be the latency that the Chaos 
 
 We need to have in mind that a good chaos engineering tool/strategy also requires a good monitoring tool/strategy to be able to realize easily about system weaknesses and be aware where they are exactly, then be able to make decisions faster to fix them, otherwise it might be painful and harder trying to improve our system however much we have developed a great chaos engineering strategy. So, I'd recommend [Application Insights](https://docs.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview), [Azure Monitor](https://docs.microsoft.com/en-us/azure/azure-monitor/overview), [Stackify Retrace](https://stackify.com/retrace/), etc.
 
-So, stay tuned because in the next post we'll propose another approach using [Azure App Configuration](https://docs.microsoft.com/en-us/azure/azure-app-configuration/overview) and how it can help us to solve the downside we mentioned before of this current approach about the latency. In the meantime, I encourage you all to start making experiments using [Simmy](https://github.com/Polly-Contrib/Simmy) so you can realize by yourself about the power of this little monkey!
+So, stay tuned because in the [next post](http://www.elvanydev.com/simmy-with-azure-app-configuration) we'll propose another approach using [Azure App Configuration](https://docs.microsoft.com/en-us/azure/azure-app-configuration/overview) and how it can help us to solve the downside we mentioned before of this current approach about the latency. In the meantime, I encourage you all to start making experiments using [Simmy](https://github.com/Polly-Contrib/Simmy) so you can realize by yourself about the power of this little monkey!
 
 ## Credits!
 > Simmy was the [brainchild](https://github.com/App-vNext/Polly/issues/499) of [@mebjas](https://github.com/mebjas) and [@reisenberger](https://github.com/reisenberger). The major part of the implementation was by [@mebjas](https://github.com/mebjas) and [myself](https://github.com/vany0114), with contributions also from [@reisenberger](https://github.com/reisenberger) of the Polly team. Thanks also to [@joelhulen](https://github.com/joelhulen) for the amazing work with the logos and the help on admin/DevOps tasks.
