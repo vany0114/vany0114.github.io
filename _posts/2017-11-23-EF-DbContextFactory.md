@@ -7,7 +7,7 @@ keywords: "asp.net core, EF.DbContextFactory, DbContextFactory, C#, c-sharp, ent
 csharp, dotnet, dotnet-core, dotnetcore, entity-framework, entity-framework-core, entityframework, ninject, ninject-extension, dbcontext, netframework, concurrency, multiple-threads, nuget, efcore, factory, webapi, webapi2"
 ---
 
-I have worked with Entity Framework in a lot of projects, it’s very useful, it can make you more productive and it has a lot of great features that make it an awesome ORM, but like everything in the world, it has its downsides or issues. Sometime I was working in a project with concurrency scenarios, reading a queue from a message bus, sending messages to another bus with SignalR and so on. Everything was going good until I did a real test with multiple users connected at the same time, it turns out Entity Framework doesn’t work fine in that scenario. I did know that DbContext is not thread safe therefore I was injecting my DbContext instance per request following the Microsoft recommendatios so every request would has a new instance and then avoid problems sharing the contexts and state’s entities inside the context, but it doesn't work in concurrency scenarios. I really had a problem, beause I didn’t want to hardcode DbContext creation inside my repository using the ***using*** statement to create and dispose inmediatly, but I had to support concurrency scenarios with Entity Framework in a proper way. So I remembered sometime studying the awesome [CQRS Journey](https://github.com/MicrosoftArchive/cqrs-journey) Microsoft project, where those guys were injecting their repositories like a factory and one of them explained me why. This was his answer:
+I have worked with Entity Framework in a lot of projects, it’s very useful, it can make you more productive and it has a lot of great features that make it an awesome ORM, but like everything in the world, it has its downsides or issues. Sometime I was working on a project with concurrency scenarios, reading a queue from a message bus, sending messages to another bus with SignalR and so on. Everything was going good until I did a real test with multiple users connected at the same time, it turns out Entity Framework doesn’t work fine in that scenario. I did know that `DbContext` is not thread safe therefore I was injecting my `DbContext` instance per request following the Microsoft recommendatios so every request would has a new instance and then avoid problems sharing the contexts and state’s entities inside the context, but it doesn't work in concurrency scenarios. I really had a problem, beause I didn’t want to hardcode `DbContext` creation inside my repository using the ***using*** statement to create and dispose inmediatly, but I had to support concurrency scenarios with Entity Framework in a proper way. So I remembered sometime studying the awesome [CQRS Journey](https://github.com/MicrosoftArchive/cqrs-journey) Microsoft project, where those guys were injecting their repositories like a factory and one of them explained me why. This was his answer:
 
 > ***This is to avoid having a permanent reference to an instance of the context. Entity Framework context life cycles should be as short as possible. Using a delegate, the context is instantiated and disposed inside the class it is injected in and on every needs.***
 
@@ -15,7 +15,7 @@ So that's why after searching an standard and good solution without finding it (
 
 ## What EF.DbContextFactory is and How it works
 
-With [EF.DbContextFactory](https://github.com/vany0114/EF.DbContextFactory) you can resolve easily your DbContext dependencies in a safe way injecting a factory instead of an instance itself, enabling you to work in [multi-thread contexts](https://msdn.microsoft.com/en-us/library/jj729737(v=vs.113).aspx?f=255&mspperror=-2147217396#Anchor_3) with Entity Framework or just work safest with DbContext following the Microsoft recommendations about the [DbContext lifecycle](https://msdn.microsoft.com/en-us/library/jj729737(v=vs.113).aspx?f=255&mspperror=-2147217396#Anchor_1) but keeping your code clean and testable using dependency injection pattern.
+With [EF.DbContextFactory](https://github.com/vany0114/EF.DbContextFactory) you can resolve easily your `DbContext` dependencies in a safe way injecting a factory instead of an instance itself, enabling you to work in [multi-thread contexts](https://msdn.microsoft.com/en-us/library/jj729737(v=vs.113).aspx?f=255&mspperror=-2147217396#Anchor_3) with Entity Framework or just work safest with DbContext following the Microsoft recommendations about the [DbContext lifecycle](https://msdn.microsoft.com/en-us/library/jj729737(v=vs.113).aspx?f=255&mspperror=-2147217396#Anchor_1) but keeping your code clean and testable using dependency injection pattern.
 
 ## The Problem
 The Entity Framework DbContext has a well-known problem: it’s not thread safe. So it means, you can’t get an instance of the same entity class tracked by multiple contexts at the same time. For example, if you have a realtime, collaborative, concurrency or reactive application/scenario, using, for instance, SignalR or multiple threads in background (which are common characteristics in modern applications). I bet you have faced this kind of exception:
@@ -34,13 +34,11 @@ There are multiple solutions to manage concurrency scenarios from data perspecti
 
 ## Getting Started
 
-EF.DbContextFactory provides you integration with most popular dependency injection frameworks such as [Unity](https://github.com/unitycontainer/unity), [Ninject](http://www.ninject.org/), [Structuremap](http://structuremap.github.io/) and [.Net Core](https://dotnet.github.io/). So there five Nuget packages so far listed above that you can use like an extension to inject your DbContext as a factory.
+EF.DbContextFactory provides you extensions to inject the `DbContext` as a factory using the Microsoft default implementation of dependency injection for `Microsoft.Extensions.DependencyInjection` as well as integration with most popular dependency injection frameworks such as [Unity](https://github.com/unitycontainer/unity), [Ninject](http://www.ninject.org/), [Structuremap](http://structuremap.github.io/) ans [Simple Injector](https://simpleinjector.org/index.html). So there are five Nuget packages so far listed above that you can use like an extension to inject your DbContext as a factory.
 
 All of nuget packages add a generic extension method to the dependency injection framework container called `AddDbContextFactory`. It needs the derived DbContext Type and as an optional parameter, the name or the connection string itself. ***If you have the default one (DefaultConnection) in the configuration file, you dont need to specify it***
 
-> **EFCore.DbContextFactory** nuget package is slightly different and will be explained later.
-
-The other thing that you need is to inject your DbContext as a factory instead of the instance itself:
+You just need to inject your DbContext as a factory instead of the instance itself:
 
 ```cs
 public class OrderRepositoryWithFactory : IOrderRepository
@@ -87,6 +85,50 @@ public class OrderRepositoryWithFactory : IOrderRepository
 }
 ``` 
 
+### EFCore.DbContextFactory
+If you are using the Microsoft DI container you only need to install [EFCore.DbContextFactory](https://www.nuget.org/packages/EFCore.DbContextFactory/) nuget package. After that, you are able to access to the extension method from the `ServiceCollection` object. 
+
+>`EFCore.DbContextFactory` supports `netstandard2.0` and `netstandard2.1`
+
+The easiest way to resolve your DbContext factory is using the extension method called `AddSqlServerDbContextFactory`. It automatically configures your DbContext to use SqlServer and you can pass it optionally  the name or the connection string itself ***If you have the default one (DefaultConnection) in the configuration file, you dont need to specify it*** and your `ILoggerFactory`, if you want.
+
+```cs
+using EFCore.DbContextFactory.Extensions;
+.
+.
+.
+services.AddSqlServerDbContextFactory<OrderContext>();
+``` 
+
+Also you can use the known method `AddDbContextFactory` with the difference that it receives the `DbContextOptionsBuilder` object so you’re able to build your DbContext as you need.
+
+```cs
+var dbLogger = new LoggerFactory(new[]
+{
+    new ConsoleLoggerProvider((category, level)
+        => category == DbLoggerCategory.Database.Command.Name
+           && level == LogLevel.Information, true)
+});
+
+// ************************************sql server**********************************************
+// this is like if you had called the AddSqlServerDbContextFactory method.
+services.AddDbContextFactory<OrderContext>(builder => builder
+    .UseSqlServer(Configuration.GetConnectionString("DefaultConnection"))
+    .UseLoggerFactory(dbLogger));
+
+// ************************************sqlite**************************************************
+services.AddDbContextFactory<OrderContext>(builder => builder
+    .UseSqlite(Configuration.GetConnectionString("DefaultConnection"))
+    .UseLoggerFactory(dbLogger));
+
+// ************************************in memory***********************************************
+services.AddDbContextFactory<OrderContext>(builder => builder
+    .UseInMemoryDatabase("OrdersExample")
+    .UseLoggerFactory(dbLogger));
+``` 
+
+> You can find more examples [here](https://github.com/vany0114/EF.DbContextFactory.Samples)
+
 ### Ninject Asp.Net Mvc and Web Api
 If you are using Ninject as DI container into your Asp.Net Mvc or Web Api project you must install [EF.DbContextFactory.Ninject](https://www.nuget.org/packages/EF.DbContextFactory.Ninject/) nuget package. After that, you are able to access to the extension method from the `Kernel` object from Ninject.
 
@@ -131,51 +173,20 @@ using EF.DbContextFactory.Unity.Extensions;
 container.AddDbContextFactory<OrderContext>();
 ``` 
 
-### Asp.Net Core
-If you are working with Asp.Net Core you probably know that it brings its own Dependency Injection container, so you don't need to install another package or framework to deal with it. So you only need to install [EFCore.DbContextFactory](https://www.nuget.org/packages/EFCore.DbContextFactory/) nuget package. After that, you are able to access to the extension method from the `ServiceCollection` object from Asp.Net Core. 
-
->EFCore.DbContextFactory is supported from .Net Core 2.0.
-
-The easiest way to resolve your DbContext factory is using the extension method called `AddSqlServerDbContextFactory`. It automatically configures your DbContext to use SqlServer and you can pass it optionally  the name or the connection string itself ***If you have the default one (DefaultConnection) in the configuration file, you dont need to specify it*** and your `ILoggerFactory`, if you want.
+### SimpleInjector Asp.Net Mvc and Web Api
+If you are using SimpleInjector as DI container into your Asp.Net Mvc or Web Api project you must install [EF.DbContextFactory.SimpleInjector](https://www.nuget.org/packages/EF.DbContextFactory.SimpleInjector/) nuget package. After that, you are able to access the extension method from the `Container` object from SimpleInjector.
 
 ```cs
-using EFCore.DbContextFactory.Extensions;
+using EF.DbContextFactory.SimpleInjector.Extensions;
 .
 .
 .
-services.AddSqlServerDbContextFactory<OrderContext>();
+container.AddDbContextFactory<OrderContext>();
 ``` 
 
-Also you can use the known method `AddDbContextFactory` with the difference that it receives the `DbContextOptionsBuilder` object so you’re able to build your DbContext as you need.
+## Examples :metal:
 
-```cs
-var dbLogger = new LoggerFactory(new[]
-{
-    new ConsoleLoggerProvider((category, level)
-        => category == DbLoggerCategory.Database.Command.Name
-           && level == LogLevel.Information, true)
-});
-
-// ************************************sql server**********************************************
-// this is like if you had called the AddSqlServerDbContextFactory method.
-services.AddDbContextFactory<OrderContext>(builder => builder
-    .UseSqlServer(Configuration.GetConnectionString("DefaultConnection"))
-    .UseLoggerFactory(dbLogger));
-
-// ************************************sqlite**************************************************
-services.AddDbContextFactory<OrderContext>(builder => builder
-    .UseSqlite(Configuration.GetConnectionString("DefaultConnection"))
-    .UseLoggerFactory(dbLogger));
-
-// ************************************in memory***********************************************
-services.AddDbContextFactory<OrderContext>(builder => builder
-    .UseInMemoryDatabase("OrdersExample")
-    .UseLoggerFactory(dbLogger));
-``` 
-
-## Examples
-
-You can find the examples in this repository and you can see the examples with Ninject, Structuremap, Structuremap.WebApi, Unity and Asp.Net Core, all you need is to run the migrations and that's it. Every example project has two controllers, one to receive a repository that implements the DbContextFactory and another one that doesn't, and every one creates and deletes orders at the same time in different threads to simulate the concurrency. So you can see how the one that doesn't implement the DbContextFactory throws errors related to concurrency issues.
+You can take a look at the [examples](https://github.com/vany0114/EF.DbContextFactory/tree/master/src/Examples) to see every extension in action, all you need is to run the migrations and that's it. Every example project has two controllers, one to receive a repository that implements the `DbContextFactory` and another one that doesn't, and every one creates and deletes orders at the same time in different threads to simulate the concurrency. So you can see how the one that doesn't implement the `DbContextFactory` throws errors related to concurrency issues.
 
 <figure>
   <img src="{{ '/images/example.gif' | prepend: site.baseurl }}" alt=""> 
