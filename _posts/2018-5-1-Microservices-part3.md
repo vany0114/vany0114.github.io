@@ -5,6 +5,7 @@ comments: true
 excerpt: In the previous post, we reviewed an approach, where we have two “different” architectures, one for the development environment and another one for the production environment, why that approach could be useful, and how Docker can help us to implement them. Also, we talked about the benefits of using Docker and why .Net Core is the better option to start working with microservices. Besides, we talked about of the most popular microservices orchestrator and why we choose Azure Service Fabric. Finally, we explained how Command and Query Responsibility Segregation (CQRS) and Event Sourcing comes into play in our architecture. In the end, we made decisions about what technologies we were going to use to implement our architecture, and the most important thing, why. So in this post we’re going to understand the code, finally!
 keywords: "asp.net core, Docker, Docker compose, linux, C#, c-sharp, DDD, .net core, dot net core, .net core 2.0, dot net core 2.0, .netcore2.0, asp.net, entity framework, entity framework core, EF Core, domain driven design, CQRS, command and query responsibility segregation, azure, microsoft azure, azure service fabric, service fabric, cosmos db, mongodb, sql server, rabbitmq, rabbit mq, amqp, asp.net web api, azure service bus, service bus"
 ---
+> I upgraded the solution to .Net Core 3.1, take a look at the [ChangeLog](https://github.com/vany0114/microservices-dotnetcore-docker-servicefabric/blob/master/ChangeLog.md) to see the enhancements!
 
 In the [previous post](http://elvanydev.com/Microservices-part2/), we reviewed an approach, where we have two “different” architectures, one for the development environment and another one for the production environment, why that approach could be useful, and how [Docker](https://www.Docker.com/) can help us to implement them. Also, we talked about the benefits of using Docker and why [.Net Core](https://dotnet.github.io/) is the better option to start working with microservices. Besides, we talked about of the most popular microservice orchestrators and why we choose [Azure Service Fabric](https://azure.microsoft.com/en-us/services/service-fabric/). Finally, we explained how [Command and Query Responsibility Segregation (CQRS)](https://martinfowler.com/bliki/CQRS.html) and [Event Sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) comes into play in our architecture. In the end, we made decisions about what technologies we were going to use to implement our architecture, and the most important thing, why. So in this post we're going to understand the code, finally!
 
@@ -13,8 +14,8 @@ In the [previous post](http://elvanydev.com/Microservices-part2/), we reviewed a
 #### Prerequisites and Installation Requirements
 1. Install [Docker for Windows](https://docs.docker.com/docker-for-windows/install/).
 2. Install [.NET Core SDK](https://www.microsoft.com/net/download/windows)
-3. Install [Visual Studio 2017](https://www.visualstudio.com/downloads/) 15.7 or later.
-4. Share drives in Docker settings (In order to deploy and debug with Visual Studio 2017)
+3. Install [Visual Studio 2019](https://www.visualstudio.com/downloads/) 16.4 or later.
+4. Share drives in Docker settings (In order to deploy and debug with Visual Studio 2019)
 5. Clone this [Repo](https://github.com/vany0114/microservices-dotnetcore-docker-servicefabric)
 6. Set `docker-compose` project as startup project. (it's already set by default)
 7. Press F5 and that's it!
@@ -63,7 +64,7 @@ Now that we're talking about dependencies, it's important to clarify the *Shared
 
 [ACL (Anti-Corruption layer)](https://docs.microsoft.com/en-us/azure/architecture/patterns/anti-corruption-layer) is also a concept from DDD, and it help us to communicate with other systems or sub-systems which obviously are outside of our domain model, such as legacy or external systems, keeping our domain consistent and avoiding the domain becomes [anemic](https://martinfowler.com/bliki/AnemicDomainModel.html). So, basically this layer translates our domain requests as the other system requires them and translates the response from the external system back in terms of our domain, keeping our domain isolated from other systems and consistent. So, to make it happen, we're just using an [Adapter](https://en.wikipedia.org/wiki/Adapter_pattern) and a Translator/Mapper and that's it (you will need an adapter per sub-system/external-system) also, you might need a Facade if you interact with many systems to encapsulate those complexity there and keep simple the communication from the domain perspective.
 
-Let's take a look at our Adapter (don't worry about  `_httpInvoker` object, we're going to explain it later)
+Let's take a look at our Adapter:
 
 ```c#
 public class PaymentServiceAdapter : IPaymentServiceAdapter
@@ -72,22 +73,15 @@ public class PaymentServiceAdapter : IPaymentServiceAdapter
 
     public async Task<PaymentInfo> ProcessPaymentAsync(int userId, string reference)
     {
-        // consumes Payment system
-        var response = await _httpInvoker.InvokeAsync(async () =>
-        {
-            var client = new RestClient(_paymentServiceBaseUrl);
-            var request = new RestRequest(ThirdPartyServices.Payment.PerformPayment(), Method.POST);
-            request.AddUrlSegment(nameof(userId), userId);
-            request.AddUrlSegment(nameof(reference), reference);
+        var uri = new Uri(
+            new Uri(_paymentServiceBaseUrl),
+            string.Format(ThirdPartyServices.Payment.PerformPayment(), userId, reference));
 
-            return await client.ExecuteTaskAsync(request);
-        });
+        var request = new HttpRequestMessage(HttpMethod.Post, uri);
+        var response = await _httpClient.SendAsync(request);
 
-        if (response.StatusCode != HttpStatusCode.OK)
-            throw new InvalidOperationException("There was an error trying to perform the payment.", response.ErrorException);
-
-        // translates payment system response to our domain model
-        return PaymentInfoTranslator.Translate(response.Content);
+        response.EnsureSuccessStatusCode();
+        return PaymentInfoTranslator.Translate(await response.Content.ReadAsStringAsync());
     }
 }
 ```
@@ -146,7 +140,7 @@ As you can see it's pretty simple, it just to simulate the external payment syst
 
 ### Implementing CQRS + Event Sourcing
 
-As we know, we decided to use CQRS and Event Sourcing in our *Trip* microservice, so first of all, I have to say that I was looking for a good package to help me to not re-invent the wheel, and I found these nice packages, [Weapsy.CQRS](https://github.com/Weapsy/Weapsy.CQRS) and [Weapsy.Cqrs.EventStore.CosmosDB.MongoDB](https://www.nuget.org/packages/Weapsy.Cqrs.EventStore.CosmosDB.MongoDB) which helped me a lot and by the way, they're very easy to use. Let's get started with the API, that's where the flow start.
+As we know, we decided to use CQRS and Event Sourcing in our *Trip* microservice, so first of all, I have to say that I was looking for a good package to help me to not re-invent the wheel, and I found these nice packages, [Kledex](https://github.com/lucabriguglia/Kledex)(formerly Weapsy.CQRS/OpenCQRS) and [Kledex.Store.Cosmos.Mongo](https://www.nuget.org/packages/Kledex.Store.Cosmos.Mongo) which helped me a lot and by the way, they're very easy to use. Let's get started with the API, that's where the flow start.
 
 ```c#
 [Route("api/v1/[controller]")]
@@ -162,28 +156,34 @@ public class TripController : Controller
     /// <param name="command"></param>
     /// <returns>Returns the newly created trip identifier.</returns>
     /// <response code="201">Returns the newly created trip identifier.</response>
-    [Route("create")]
     [HttpPost]
     [ProducesResponseType(typeof(Guid), (int)HttpStatusCode.Created)]
     [ProducesResponseType((int)HttpStatusCode.BadRequest)]
     [ProducesResponseType((int)HttpStatusCode.InternalServerError)]
     public async Task<IActionResult> CreateTrip([FromBody]ViewModel.CreateTripCommand command)
     {
-        ...
-        await _dispatcher.SendAndPublishAsync<CreateTripCommand, Domain.Trip.Model.Trip>(domainCommand);
+        // TODO: make command immutable
+        // BadRequest and InternalServerError could be throw in HttpGlobalExceptionFilter
+        var tripId = Guid.NewGuid();
+        var domainCommand = _mapper.Map<CreateTripCommand>(command);
+        domainCommand.AggregateRootId = tripId;
+        domainCommand.Source = Source;
+        domainCommand.UserId = _fakeUser;
+
+        await _dispatcher.SendAsync(domainCommand);
         return Created(HttpContext.Request.GetUri().AbsoluteUri, tripId);
     }
 }
 ```
 
-The most important thing here is the `_dispatcher` object, which takes care of queuing our commands (in this case, in memory), triggers the command handlers, which interacts with our domain, through the Aggregates, and then, publish our domain events triggered from Aggregates and Entities in order to publish them in our Message Broker. No worries if it sounds kind of complicated, let's check every step.
+The most important thing here is the `_dispatcher` object, which takes care of queuing our commands (in this case, in memory), triggers the command handlers, which interacts with our domain, through the Aggregates, and then, publish our domain events triggered from Aggregates/Entities in order to publish them in our Message Broker. No worries if it sounds kind of complicated, let's check every step.
 
 * **Command Handlers**
 
 ```c#
-public class CreateTripCommandHandlerAsync : ICommandHandlerWithAggregateAsync<CreateTripCommand>
+public class CreateTripCommandHandlerAsync : ICommandHandlerAsync<CreateTripCommand>
 {
-    public async Task<IAggregateRoot> HandleAsync(CreateTripCommand command)
+    public async Task<CommandResponse> HandleAsync(CreateTripCommand command)
     {
         var trip = new Model.Trip(
             command.AggregateRootId,
@@ -197,12 +197,15 @@ public class CreateTripCommandHandlerAsync : ICommandHandlerWithAggregateAsync<C
             command.Model);
         
         await Task.CompletedTask;
-        return trip;
+        return new CommandResponse
+        {
+            Events = trip.Events
+        };
     }
 }
 ```
 
-So, this is our command handler where we manage the creation of a Trip when the `Dispatcher` triggers it. As you can see, we explicitly create a `Trip` object, but it's beyond that, since it's not just a regular object, is an Aggregate. Let's take a look at what happens into the Aggregate.
+So, this is our command handler where we manage the creation of a Trip when the `Dispatcher` triggers it. As you can see, we explicitly create a `Trip` object, but it's beyond that, since it's not just a regular object, it's an Aggregate. Let's take a look at what happens into the Aggregate.
 
 * **Aggregate**
 
@@ -270,14 +273,14 @@ public class TripCreatedDomainEventHandlerAsync : IEventHandlerAsync<TripCreated
 }
 ```
 
-Therefore, after a Trip is created we want to notify all the interested parties through the `Event Bus`. We need to map the `TripCreatedDomainEvent` to `TripCreatedIntegrationEvent` the first one is an implementation of *Weapsy.CQRS* library and the second one, it's the implementation of the integration events which our Event Bus expects.
+Therefore, after a Trip is created we want to notify all the interested parties through the `Event Bus`. We need to map the `TripCreatedDomainEvent` to `TripCreatedIntegrationEvent` the first one is an implementation of *Kledex* library and the second one, it's the implementation of the integration events which our Event Bus expects.
 
 > It's important to remember that using an Event Store we don't save the object state as usual in a RDBMS or NoSQL database, we save a series of events that enable us to retrieve the current state of the object or even a certain state at some point in time.
 
-When we retrieve an object from our Event Store, we're re-building the object with all the past events, behind the scenes. That's why we have some methods called `Apply` into the aggregates, because that's how, in this case, *Weapsy.Cqrs.EventStore* re-creates the object, calling these methods for every event of the aggregate.
+When we retrieve an object from our Event Store, we're re-building the object with all the past events, behind the scenes. That's why we have some methods called `Apply` into the aggregates, because that's how, in this case, *Kledex.Store.Cosmos.Mongo* re-creates the object, calling these methods for every event of the aggregate.
 
 ```c#
-public class UpdateTripCommandHandlerAsync : ICommandHandlerWithAggregateAsync<UpdateTripCommand>
+public class UpdateTripCommandHandlerAsync : ICommandHandlerAsync<UpdateTripCommand>
 {
     private readonly IRepository<Model.Trip> _repository;
 
@@ -308,7 +311,7 @@ public class Trip : AggregateRoot
 
 * **Domain Event Handlers with MediatR**
 
-As I said earlier, we are using `Weapsy.CQRS` in our *Trip* microservice to manage CQRS stuff, among them, domain events/handlers. But we still have to manage domain events/handlers in our *Invoice* microservice, that's why we're going to use [MediatR](https://github.com/jbogard/MediatR) to manage them. So, the idea is the same as described earlier, we have domain events which are dispatched through a dispatcher to all interested parties. So, the idea is pretty simple, we have an abstraction of an `Entity` which is the one that publishes domain events in our domain model (remember, an `Aggregate` is an `Entity` as well). So, every time an *Entity* calls `AddDomainEvent` method, we're just storing the event in memory.
+As I said earlier, we are using `Kledex` in our *Trip* microservice to manage CQRS stuff, among them, domain events/handlers. But we still have to manage domain events/handlers in our *Invoice* microservice, that's why we're going to use [MediatR](https://github.com/jbogard/MediatR) to manage them. So, the idea is the same as described earlier, we have domain events which are dispatched through a dispatcher to all interested parties. So, the idea is pretty simple, we have an abstraction of an `Entity` which is the one that publishes domain events in our domain model (remember, an `Aggregate` is an `Entity` as well). So, every time an *Entity* calls `AddDomainEvent` method, we're just storing the event in memory.
 
 ```c#
 public abstract class Entity
@@ -381,7 +384,7 @@ Handling temporary errors properly in a distributed system is a key piece in ord
 services.AddDbContext<UserContext>(options =>
 {
     options.UseSqlServer(
-        Configuration["ConnectionString"],
+        configuration["ConnectionStrings:WebsiteDB"],
         sqlOptions =>
         {
             ...
@@ -391,173 +394,37 @@ services.AddDbContext<UserContext>(options =>
 ```
 Also, you can customize [your own execution strategies](https://docs.microsoft.com/en-us/ef/core/miscellaneous/connection-resiliency#custom-execution-strategy) if you need it.
 
-* **Taking advantage of Polly:** [Polly](https://github.com/App-vNext/Polly) it's a pretty cool library which help us to create our own policies in order to manage strategies for transient errors, such as retry, circuit breaker, timeout, fallback, etc. So, in our case, we're using *Polly* to improve the Http communication in order to communicate our frontend with our *Trip* microservice, and as you saw earlier, to communicate the *Invoice* microservice with the *Payment* external system. So, I made a very basic `ResilientHttpInvoker`, using [RestSharp](http://restsharp.org), which is a great Http client.
+* **Taking advantage of Polly:** [Polly](https://github.com/App-vNext/Polly) it's a pretty cool library which help us to create our own policies in order to manage strategies for transient errors, such as retry, circuit breaker, timeout, fallback, etc. So, in our case, we're using *Polly* to improve the Http communication in order to communicate our frontend with our *Trip* microservice, and as you saw earlier, to communicate the *Invoice* microservice with the *Payment* external system. So, I followed the pattern I proposed in my other post [Building resilient applications with Polly](http://elvanydev.com/resilience-with-polly/) in order to build a specific resilience strategy, in our case an Azure SQL Server one. We're also using and [HttpClient + Polly](https://docs.microsoft.com/en-us/dotnet/architecture/microservices/implement-resilient-applications/implement-http-call-retries-exponential-backoff-polly) to make more resilient the HTTP calls.
 
 ```c#
-public class ResilientHttpInvoker
+// Resilient Async SQL Executor configuration.
+services.AddSingleton<IPolicyAsyncExecutor>(sp =>
 {
-    ...
+    var sqlPolicyBuilder = new SqlPolicyBuilder();
+    return sqlPolicyBuilder
+        .UseAsyncExecutor()
+        .WithDefaultPolicies()
+        .Build();
+});
 
-    public Task<IRestResponse> InvokeAsync(Func<Task<IRestResponse>> action)
-    {
-        return HttpInvoker(async () =>
-        {
-            var response = await action.Invoke();
+// Create (and register with DI) a policy registry containing some policies we want to use.
+var policyRegistry = services.AddPolicyRegistry();
+policyRegistry[ResiliencePolicy] = GetHttpResiliencePolicy(configuration);
 
-            // raise exception if HttpResponseCode 500 
-            // needed for circuit breaker to track fails
-            if (response.StatusCode == HttpStatusCode.InternalServerError)
-            {
-                throw new HttpRequestException();
-            }
-
-            return response;
-        });
-    }
-
-    private async Task<T> HttpInvoker<T>(Func<Task<T>> action)
-    {
-        // Executes the action applying all the policies defined in the wrapper
-        var policyWrap = Policy.WrapAsync(_policies.ToArray());
-        return await policyWrap.ExecuteAsync(action);
-    }
-}
-```
-And we have a factory who is in charge of creating the `ResilientHttpInvoker` with the policies that we need to take care of.
-```c#
-public class ResilientHttpInvokerFactory
+// Resilient Http Invoker onfiguration.
+// Register a typed client via HttpClientFactory, set to use the policy we placed in the policy registry.
+services.AddHttpClient<ResilientHttpClient>(client =>
 {
-    ...
-
-    public ResilientHttpInvoker CreateResilientHttpClient()
-        => new ResilientHttpInvoker(CreatePolicies());
-
-    private Policy[] CreatePolicies()
-        => new Policy[]
-        {
-            Policy.Handle<HttpRequestException>()
-                .WaitAndRetryAsync(
-                    // number of retries
-                    _retryCount,
-                    // exponential backofff
-                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                    // on retry
-                    (exception, timeSpan, retryCount, context) =>
-                    {
-                        var msg = $"Retry {retryCount} implemented with Polly's RetryPolicy " +
-                                    $"of {context.PolicyKey} " +
-                                    $"at {context.OperationKey}, " +
-                                    $"due to: {exception}.";
-                        _logger.LogWarning(msg);
-                        _logger.LogDebug(msg);
-                    }),
-            Policy.Handle<HttpRequestException>()
-                .CircuitBreakerAsync( 
-                    // number of exceptions before breaking circuit
-                    _exceptionsAllowedBeforeBreaking,
-                    // time circuit opened before retry
-                    TimeSpan.FromMinutes(1),
-                    (exception, duration) =>
-                    {
-                        // on circuit opened
-                        _logger.LogTrace("Circuit breaker opened");
-                    },
-                    () =>
-                    {
-                        // on circuit closed
-                        _logger.LogTrace("Circuit breaker reset");
-                    })
-        };
-}
-```
-Basically, we are retrying `_retryCount` times, when an `HttpRequestException` occurs, and we're using an exponential backofff to determine how long we should wait between each retry, e.g: `2 ^ 1 = 2 seconds then, 2 ^ 2 = 4 seconds then, etc.` But, we don't want to wait and retry forever and spend valuable resources if it turned out being a non-transient error, that's why we are using a [CircuitBreaker](https://martinfowler.com/bliki/CircuitBreaker.html), that basically break the circuit after the specified number (`_exceptionsAllowedBeforeBreaking`) of consecutive `HttpRequestException`s and keep circuit broken for one minute, which means, every request within that period will not be executed, instead the call will fail fast with the last exception occurred.
-
-The other place where we're using *Polly* is in our `InvoiceContext`, which is implemented with [Dapper](https://github.com/StackExchange/Dapper), so I made a simple `ResilientExecutor<>` that we can use where we want it, of course with the right policies.
-
-```c#
-public class ResilientExecutor<ExecutorType>
-{
-    ...
-
-    public Task<T> ExecuteAsync<T>(Func<Task<T>> action)
-    {
-        return Executor(async () =>
-        {
-            var response = await action.Invoke();
-            return response;
-        });
-    }
-
-    private async Task<T> Executor<T>(Func<Task<T>> action)
-    {
-        // Executes the action applying all the policies defined in the wrapper
-        var policyWrap = Policy.WrapAsync(_policies.ToArray());
-        return await policyWrap.ExecuteAsync(action);
-    }
-}
-```
-So, we're going to have a specific factory to create our `ResilientExecutor<>`, in this case, we need it to handle the `SqlException`s.
-
-```c#
-public class ResilientSqlExecutorFactory : ISqlExecutor
-{
-    ...
-
-    public ResilientExecutor<ISqlExecutor> CreateResilientSqlClient()
-        => new ResilientExecutor<ISqlExecutor>(CreatePolicies());
-
-    /// <summary>
-    /// Consider include in your policies all exceptions as you needed.
-    /// https://docs.microsoft.com/en-us/azure/sql-database/sql-database-develop-error-messages
-    /// </summary>
-    private Policy[] CreatePolicies()
-        => new Policy[]
-        {
-            Policy.Handle<SqlException>(ex => ex.Number == 40613)
-                .Or<SqlException>(ex => ex.Number == 40197)
-                .Or<SqlException>(ex => ex.Number == 40501)
-                .Or<SqlException>(ex => ex.Number == 49918)
-                .WaitAndRetryAsync(
-                    // number of retries
-                    _retryCount,
-                    // exponential backofff
-                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                    // on retry
-                    (exception, timeSpan, retryCount, context) =>
-                    {
-                        var msg = $"Retry {retryCount} implemented with Polly's RetryPolicy " +
-                                    $"of {context.PolicyKey} " +
-                                    $"at {context.OperationKey}, " +
-                                    $"due to: {exception}.";
-                        _logger.LogWarning(msg);
-                        _logger.LogDebug(msg);
-                    }),
-            Policy.Handle<SqlException>()
-                .CircuitBreakerAsync( 
-                    // number of exceptions before breaking circuit
-                    _exceptionsAllowedBeforeBreaking,
-                    // time circuit opened before retry
-                    TimeSpan.FromMinutes(1),
-                    (exception, duration) =>
-                    {
-                        // on circuit opened
-                        _logger.LogTrace("Circuit breaker opened");
-                    },
-                    () =>
-                    {
-                        // on circuit closed
-                        _logger.LogTrace("Circuit breaker reset");
-                    })
-        };
-}
+    client.Timeout = TimeSpan.FromSeconds(50);
+}).AddPolicyHandlerFromRegistry(ResiliencePolicy);
 ```
 
-In this case, we're handling a very specific `SqlException`s, which are the most common [SQL transient errors](https://docs.microsoft.com/en-us/azure/sql-database/sql-database-develop-error-messages).
+The other place where we're using *Polly* is in our `InvoiceContext`, which is implemented with [Dapper](https://github.com/StackExchange/Dapper).In this case, we're handling a very specific `SqlException`s throug our [SqlPolicyBuilder](https://github.com/vany0114/microservices-dotnetcore-docker-servicefabric/blob/master/src/Infrastructure/Duber.Infrastructure.Resilience.Sql/SqlPolicyBuilder.cs), which are the most common [SQL transient errors](https://docs.microsoft.com/en-us/azure/sql-database/sql-database-develop-error-messages).
 
 ```c#
 public class InvoiceContext : IInvoiceContext
 {
-    private readonly ResilientExecutor<ISqlExecutor> _resilientSqlExecutor;
+    private readonly IPolicyAsyncExecutor _resilientSqlExecutor;
     ...
 
     public async Task<IEnumerable<T>> QueryAsync<T>(string sql, object parameters = null, int? timeOut = null, CommandType? commandType = null)
