@@ -3,7 +3,7 @@ layout: post
 title: Microservices and Docker with .Net Core and Azure Service Fabric - Part four
 comments: true
 excerpt: In the last post, we had the opportunity to made real our Microservices architecture and everything that we’ve talked about in these series of posts about this interesting topic, we implemented a solution using DDD, CQRS and Event Sourcing with the help of .Net Core, RabbitMQ, Dapper, Polly, etc. We also analyzed the key points in our code in order to understand how all pieces work together and lastly, we took a look at Docker configuration and how it works in our local environment. In this last post, we’re going to talk about how to deploy our solution in a production environment using Azure Service Fabric as a microservices orchestrator and using other resources on the cloud, like Azure Service Bus, Sql Databases, and CosmosDB.
-keywords: "asp.net core, Docker, Docker compose, linux, C#, c-sharp, DDD, .net core, dot net core, .net core 2.0, dot net core 2.0, .netcore2.0, asp.net, entity framework, entity framework core, EF Core, domain driven design, CQRS, command and query responsibility segregation, azure, microsoft azure, azure service fabric, service fabric, cosmos db, mongodb, sql server, rabbitmq, rabbit mq, amqp, asp.net web api, azure service bus, service bus"
+keywords: "asp.net core, Docker, Docker compose, linux, C#, c-sharp, DDD, .net core, dot net core, .net core 3.1, dot net core 3.1, .netcore3.1, asp.net, entity framework, entity framework core, EF Core, domain driven design, CQRS, command and query responsibility segregation, azure, microsoft azure, azure service fabric, service fabric, cosmos db, mongodb, sql server, rabbitmq, rabbit mq, amqp, asp.net web api, azure service bus, service bus"
 
 ---
 
