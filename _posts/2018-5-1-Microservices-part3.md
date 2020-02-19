@@ -5,7 +5,7 @@ comments: true
 excerpt: In the previous post, we reviewed an approach, where we have two “different” architectures, one for the development environment and another one for the production environment, why that approach could be useful, and how Docker can help us to implement them. Also, we talked about the benefits of using Docker and why .Net Core is the better option to start working with microservices. Besides, we talked about of the most popular microservices orchestrator and why we choose Azure Service Fabric. Finally, we explained how Command and Query Responsibility Segregation (CQRS) and Event Sourcing comes into play in our architecture. In the end, we made decisions about what technologies we were going to use to implement our architecture, and the most important thing, why. So in this post we’re going to understand the code, finally!
 keywords: "asp.net core, Docker, Docker compose, linux, C#, c-sharp, DDD, .net core, dot net core, .net core 3.1, dot net core 3.1, .netcore3.1, asp.net, entity framework, entity framework core, EF Core, domain driven design, CQRS, command and query responsibility segregation, azure, microsoft azure, azure service fabric, service fabric, cosmos db, mongodb, sql server, rabbitmq, rabbit mq, amqp, asp.net web api, azure service bus, service bus"
 ---
-> I upgraded the solution to .Net Core 3.1, take a look at the [ChangeLog](https://github.com/vany0114/microservices-dotnetcore-docker-servicefabric/blob/master/ChangeLog.md) to see the enhancements!
+> I upgraded the solution to .Net Core 3.1, take a look at the [ChangeLog](https://github.com/vany0114/microservices-dotnetcore-docker-servicefabric/blob/master/ChangeLog.md) to see the enhancements! 
 
 In the [previous post](http://elvanydev.com/Microservices-part2/), we reviewed an approach, where we have two “different” architectures, one for the development environment and another one for the production environment, why that approach could be useful, and how [Docker](https://www.Docker.com/) can help us to implement them. Also, we talked about the benefits of using Docker and why [.Net Core](https://dotnet.github.io/) is the better option to start working with microservices. Besides, we talked about of the most popular microservice orchestrators and why we choose [Azure Service Fabric](https://azure.microsoft.com/en-us/services/service-fabric/). Finally, we explained how [Command and Query Responsibility Segregation (CQRS)](https://martinfowler.com/bliki/CQRS.html) and [Event Sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) comes into play in our architecture. In the end, we made decisions about what technologies we were going to use to implement our architecture, and the most important thing, why. So in this post we're going to understand the code, finally!
 
@@ -13,7 +13,7 @@ In the [previous post](http://elvanydev.com/Microservices-part2/), we reviewed a
 
 #### Prerequisites and Installation Requirements
 1. Install [Docker for Windows](https://docs.docker.com/docker-for-windows/install/).
-2. Install [.NET Core SDK](https://www.microsoft.com/net/download/windows)
+2. Install [.NET Core SDK](https://www.microsoft.com/net/download/windows).
 3. Install [Visual Studio 2019](https://www.visualstudio.com/downloads/) 16.4 or later.
 4. Share drives in Docker settings (In order to deploy and debug with Visual Studio 2019)
 5. Clone this [Repo](https://github.com/vany0114/microservices-dotnetcore-docker-servicefabric)
